@@ -95,6 +95,7 @@ class ProductService {
           costPrice: (p['cost_price'] as num).toDouble(),
           // ✅ PROTECT LOCAL STOCK
           stock: localStock ?? (p['stock'] as int),
+          byPieces: (p['by_pieces'] as num).toDouble(),
           isPromo: p['is_promo'] as bool? ?? false,
           otherQty: p['other_qty'] as int? ?? 0,
           clientUuid: p['client_uuid']?.toString(),
@@ -121,6 +122,7 @@ class ProductService {
               retailPrice: e['retail_price'],
               costPrice: e['cost_price'],
               stock: e['stock'],
+              byPieces: e['by_pieces'] ?? 0,
               isPromo: e['is_promo'] == 1,
               productClientUuid: e['client_uuid'] as String,
               otherQty: e['other_qty'] ?? 0,
@@ -347,6 +349,7 @@ class ProductService {
       final name = p['name']?.toString() ?? '';
       final costPrice = (p['cost_price'] as num).toDouble();
       final retailPrice = (p['retail_price'] as num).toDouble();
+      final byPieces = p['by_pieces'] as int? ?? 0;
       final stock = p['stock'] as int;
       final isPromo = (p['is_promo'] == 1);
       final otherQty = p['other_qty'] as int? ?? 0;
@@ -357,10 +360,10 @@ class ProductService {
             .from('products')
             .update({
               'name': name,
-
               'cost_price': costPrice,
               'retail_price': retailPrice,
               'stock': stock,
+              'by_pieces': byPieces,
               'is_promo': isPromo,
               'other_qty': otherQty,
             })
@@ -373,6 +376,7 @@ class ProductService {
           'cost_price': costPrice,
           'retail_price': retailPrice,
           'stock': stock,
+          'by_pieces': byPieces,
           'is_promo': isPromo,
           'other_qty': otherQty,
           'client_uuid': clientUuid,
@@ -413,6 +417,7 @@ class ProductService {
       'cost_price': costPrice,
       'retail_price': retailPrice,
       'stock': stock,
+      'by_pieces': byPieces,
       'is_promo': isPromo ? 1 : 0,
       'other_qty': otherQty,
       'is_synced': 0,
@@ -671,6 +676,7 @@ class ProductService {
           name: p['name'],
           cost_price: (p['cost_price'] as num).toDouble(),
           retail_price: (p['retail_price'] as num).toDouble(),
+          byPieces: (p['by_pieces'] as num).toDouble(),
           stock: p['stock'] as int,
           isPromo: p['is_promo'] as bool? ?? false,
           otherQty: p['other_qty'] as int? ?? 0,
@@ -728,6 +734,7 @@ class ProductService {
     double costPrice,
     double retailPrice,
     int stock,
+    int byPieces,
     bool isPromo,
     int otherQty,
   ) async {
@@ -739,6 +746,7 @@ class ProductService {
       'cost_price': costPrice,
       'retail_price': retailPrice,
       'stock': stock,
+      'by_pieces': byPieces,
       'is_promo': isPromo,
       'other_qty': otherQty,
       'client_uuid': clientUuid,
@@ -871,6 +879,11 @@ class ProductService {
         : (p['cost_price'] as double);
 
     final stock = p['stock'] as int;
+
+     final byPieces = p['by_pieces'] is int
+    ? p['by_pieces'] as int
+    : int.tryParse(p['by_pieces']?.toString() ?? '0') ?? 0;
+    
     final isPromo = (p['is_promo'] ?? 0) == 1;
     final otherQty = p['other_qty'] as int;
 
@@ -890,6 +903,7 @@ class ProductService {
               'cost_price': costPrice,
               'retail_price': retailPrice,
               'stock': stock,
+              'by_pieces': byPieces, 
               'is_promo': isPromo,
               'other_qty': otherQty,
               'updated_at': DateTime.now().toIso8601String(),
@@ -903,6 +917,7 @@ class ProductService {
           'cost_price': costPrice,
           'retail_price': retailPrice,
           'stock': stock,
+          'by_pieces': byPieces,
           'is_promo': isPromo,
           'other_qty': otherQty,
           'client_uuid': clientUuid,

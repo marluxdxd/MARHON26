@@ -136,6 +136,7 @@ class _AddProductPageEditState extends State<AddProductPageEdit> {
       await db.updateProduct(
         id: widget.product['id'],
         stock: widget.product['stock'] ?? 0,
+        byPieces: widget.product['by_pieces'] ?? 0,
         costPrice: costPrice,
         retailPrice: retailPrice,
         isPromo: isPromo,

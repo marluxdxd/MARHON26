@@ -1,8 +1,11 @@
+import 'package:cashier/class/productclass.dart';
 import 'package:cashier/services/product_service.dart';
 import 'package:flutter/material.dart';
 
 class AddProductPage extends StatefulWidget {
-  const AddProductPage({super.key});
+  final Productclass? product;
+
+  const AddProductPage({super.key, this.product});
 
   @override
   State<AddProductPage> createState() => _AddProductPageState();
@@ -24,97 +27,52 @@ class _AddProductPageState extends State<AddProductPage> {
   bool isPromo = false;
   int otherQty = 0;
 
-  /// ------------------- CALCULATIONS ------------------- ///
+  /// ⭐ INIT EDIT MODE
+  @override
+  void initState() {
+    super.initState();
 
-  void computePromoLogic() {
-    final costPrice = double.tryParse(costPriceController.text) ?? 0;
-    final pieces = int.tryParse(byPiecesController.text) ?? 0;
-    final qtyPromo = int.tryParse(promoQtyController.text) ?? 0;
-    final retailPrice = double.tryParse(retailPriceController.text) ?? 0;
+    if (widget.product != null) {
+      final p = widget.product!;
 
-    if (pieces == 0 || qtyPromo == 0) {
-      setState(() {
-        pricePerPiece = 0;
-        priceInterest = 0;
+      nameController.text = p.name;
+      costPriceController.text = p.costPrice.toString();
+      retailPriceController.text = p.retailPrice.toString();
+      byPiecesController.text = p.byPieces.toString();
+      promoQtyController.text = p.otherQty.toString();
+
+      isPromo = p.isPromo;
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        computePricePerPiece();
+        computeInterest();
       });
-      return;
     }
-
-    final ppp = costPrice / pieces;
-    final promoSets = (pieces ~/ qtyPromo);
-    final totalRetail = promoSets * retailPrice;
-    final interest = totalRetail - costPrice;
-
-    setState(() {
-      pricePerPiece = ppp;
-      priceInterest = interest;
-    });
   }
 
-  void computePricePerPiece() {
-    final costPrice = double.tryParse(costPriceController.text) ?? 0;
-    final pieces = int.tryParse(byPiecesController.text) ?? 0;
-
-    setState(() {
-      pricePerPiece = pieces > 0 ? costPrice / pieces : 0;
-    });
-
-    computeInterest();
-  }
-
-  void computeInterest() {
-    if (isPromo) {
-      computePromoLogic();
-      return;
-    }
-
-    final retailPrice = double.tryParse(retailPriceController.text) ?? 0;
-
-    setState(() {
-      priceInterest = retailPrice - pricePerPiece;
-    });
-  }
-
-  /// ------------------- SAVE PRODUCT ------------------- ///
+  /// ⭐ SAVE PRODUCT (CREATE + UPDATE)
   void saveProduct() async {
     final name = nameController.text.trim();
-    final costPrice = double.tryParse(costPriceController.text.trim()) ?? 0;
-    final retailPrice = double.tryParse(retailPriceController.text.trim()) ?? 0;
-    final byPieces = int.tryParse(byPiecesController.text.trim()) ?? 0;
-    otherQty = int.tryParse(promoQtyController.text.trim()) ?? 0;
+    final costPrice =
+        double.tryParse(costPriceController.text.trim()) ?? 0;
+    final retailPrice =
+        double.tryParse(retailPriceController.text.trim()) ?? 0;
+    final byPieces =
+        int.tryParse(byPiecesController.text.trim()) ?? 0;
+
+    otherQty =
+        int.tryParse(promoQtyController.text.trim()) ?? 0;
 
     if (name.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please enter product name")),
+        const SnackBar(content: Text("Enter product name")),
       );
       return;
     }
 
     if (byPieces <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("By Pieces must be greater than 0")),
-      );
-      return;
-    }
-
-    final online = await productService.isOnline1();
-    if (!online) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("No internet connection. Cannot save product."),
-        ),
-      );
-      return;
-    }
-
-    final exists = await productService.productNameExists(name);
-    if (exists) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Product $name with price: $retailPrice already exists.',
-          ),
-        ),
+        const SnackBar(content: Text("By pieces must be > 0")),
       );
       return;
     }
@@ -122,157 +80,169 @@ class _AddProductPageState extends State<AddProductPage> {
     setState(() => isLoading = true);
 
     try {
-      final localId = await productService.insertProductOffline(
-        name: name,
-        costPrice: costPrice,
-        retailPrice: retailPrice,
-        byPieces: byPieces, // ✅ save byPieces in DB
-        stock: 0,
-        isPromo: isPromo,
-        otherQty: otherQty,
-      );
+      final online = await productService.isOnline1();
 
-      // Sync online if possible
-      if (await productService.isOnline2()) {
+      /// ⭐ CREATE MODE
+      if (widget.product == null) {
+        await productService.insertProductOffline(
+          name: name,
+          costPrice: costPrice,
+          retailPrice: retailPrice,
+          stock: 0,
+          byPieces: byPieces,
+          isPromo: isPromo,
+          otherQty: otherQty,
+        );
+      }
+
+      /// ⭐ UPDATE MODE
+      else {
+        final clientUuid = widget.product!.productClientUuid;
+
+        final db = await productService.localDb.database;
+
+        await db.update(
+          "products",
+          {
+            "name": name,
+            "cost_price": costPrice,
+            "retail_price": retailPrice,
+            "by_pieces": byPieces,
+            "is_promo": isPromo ? 1 : 0,
+            "other_qty": otherQty,
+            "is_synced": 0,
+          },
+          where: "client_uuid = ?",
+          whereArgs: [clientUuid],
+        );
+
+        /// Sync update online
+        if (await productService.isOnline2()) {
+          await productService.syncSingleProductOnline(
+            widget.product!.id,
+          );
+        }
+      }
+
+      if (online) {
         await productService.syncOnlineProducts();
       }
-      if (await productService.isOnline1()) {
-        await productService.syncSingleProduct(localId);
-      }
-
-      setState(() => isLoading = false);
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            online
-                ? "Product added and synced online!"
-                : "Product added locally. Will sync when online.",
-          ),
+          content: Text(widget.product == null
+              ? "Product added"
+              : "Product updated"),
         ),
       );
 
-      // Clear input fields
-      nameController.clear();
-      costPriceController.clear();
-      byPiecesController.clear();
-      retailPriceController.clear();
-      promoQtyController.clear();
-
-      setState(() {
-        pricePerPiece = 0;
-        priceInterest = 0;
-        isPromo = false;
-      });
+      Navigator.pop(context);
     } catch (e) {
-      setState(() => isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error saving product: $e")),
-      );
+      print(e);
     }
+
+    setState(() => isLoading = false);
   }
 
-  @override
-  void dispose() {
-    nameController.dispose();
-    costPriceController.dispose();
-    byPiecesController.dispose();
-    retailPriceController.dispose();
-    promoQtyController.dispose();
-    super.dispose();
+  /// ⭐ CALCULATIONS
+  void computePricePerPiece() {
+    final costPrice =
+        double.tryParse(costPriceController.text) ?? 0;
+    final pieces =
+        int.tryParse(byPiecesController.text) ?? 0;
+
+    setState(() {
+      pricePerPiece =
+          pieces > 0 ? costPrice / pieces : 0;
+    });
+
+    computeInterest();
   }
 
-  /// ------------------- UI ------------------- ///
+  void computeInterest() {
+    final retailPrice =
+        double.tryParse(retailPriceController.text) ?? 0;
+
+    setState(() {
+      priceInterest = retailPrice - pricePerPiece;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
+    final isEdit = widget.product != null;
+
     return Scaffold(
-      appBar: AppBar(title: const Text("Add Product")),
+      appBar: AppBar(
+        title: Text(isEdit ? "Edit Product" : "Add Product"),
+      ),
+
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
+
             CheckboxListTile(
               title: const Text("Promo"),
               value: isPromo,
-              onChanged: (val) {
-                setState(() => isPromo = val ?? false);
+              onChanged: (v) {
+                setState(() => isPromo = v ?? false);
               },
             ),
+
             if (isPromo)
               TextField(
                 controller: promoQtyController,
                 keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: "Qty for Promo"),
-                onChanged: (_) => computePromoLogic(),
+                decoration:
+                    const InputDecoration(labelText: "Promo Qty"),
               ),
+
             TextField(
               controller: nameController,
-              decoration: const InputDecoration(labelText: "Product Name"),
+              decoration:
+                  const InputDecoration(labelText: "Product Name"),
             ),
+
             TextField(
               controller: costPriceController,
               keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: "Cost Price"),
-              onChanged: (_) {
-                computePricePerPiece();
-                if (isPromo) computePromoLogic();
-              },
+              onChanged: (_) => computePricePerPiece(),
+              decoration:
+                  const InputDecoration(labelText: "Cost Price"),
             ),
+
             TextField(
               controller: byPiecesController,
               keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: "By Pieces"),
-              onChanged: (_) {
-                computePricePerPiece();
-                if (isPromo) computePromoLogic();
-              },
+              onChanged: (_) => computePricePerPiece(),
+              decoration:
+                  const InputDecoration(labelText: "By Pieces"),
             ),
-            const SizedBox(height: 10),
-            if (!isPromo)
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey),
-                      borderRadius: BorderRadius.circular(4),
-                      color: Colors.grey[200],
-                    ),
-                    child: Text(
-                        'Price per piece: ₱${pricePerPiece.toStringAsFixed(2)}'),
-                  ),
-                ],
-              ),
+
             TextField(
               controller: retailPriceController,
               keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: "Retail Price"),
-              onChanged: (_) {
-                computeInterest();
-                if (isPromo) computePromoLogic();
-              },
+              onChanged: (_) => computeInterest(),
+              decoration:
+                  const InputDecoration(labelText: "Retail Price"),
             ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey),
-                    borderRadius: BorderRadius.circular(4),
-                    color: Colors.grey[200],
-                  ),
-                  child: Text(
-                      'Interest ₱${priceInterest.toStringAsFixed(2)}'),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
+
+            const SizedBox(height: 15),
+
+            Text(
+                "Price per piece: ₱${pricePerPiece.toStringAsFixed(2)}"),
+
+            Text(
+                "Interest: ₱${priceInterest.toStringAsFixed(2)}"),
+
+            const SizedBox(height: 25),
+
             ElevatedButton(
               onPressed: isLoading ? null : saveProduct,
               child: isLoading
-                  ? const CircularProgressIndicator(color: Colors.white)
-                  : const Text("Save Product"),
+                  ? const CircularProgressIndicator()
+                  : Text(isEdit ? "Update Product" : "Save Product"),
             ),
           ],
         ),

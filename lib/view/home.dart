@@ -187,17 +187,18 @@ class _HomeState extends State<Home> {
             ),
 
             // ---------------- POS Rows ----------------
-            Expanded(
-              child: ListView.builder(
-                itemCount: posManager.rows.length,
-                itemBuilder: (_, index) => posManager.buildRow(
-                  posManager.rows[index],
-                  index,
-                  onUpdate: _updateUI,
-                  isAutoNextRowOn: isAutoNextRowOn,
-                ),
-              ),
-            ),
+            SizedBox(
+  height: MediaQuery.of(context).size.height * 0.50,
+  child: ListView.builder(
+    itemCount: posManager.rows.length,
+    itemBuilder: (_, index) => posManager.buildRow(
+      posManager.rows[index],
+      index,
+      onUpdate: _updateUI,
+      isAutoNextRowOn: isAutoNextRowOn,
+    ),
+  ),
+),
             // ElevatedButton(
             //   style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             //   onPressed: () async {

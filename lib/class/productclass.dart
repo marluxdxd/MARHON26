@@ -6,6 +6,7 @@ class Productclass {
   final double retailPrice;
   final double costPrice;
   int stock;
+  int byPieces;
   final bool isPromo;
   final int otherQty;
   final String type; // 'add', 'update', 'delete' for sync
@@ -17,6 +18,7 @@ class Productclass {
     required this.retailPrice,
     required this.costPrice,
     required this.stock,
+    required this.byPieces,
     required this.productClientUuid, // ✅ REQUIRED
     this.isPromo = false, // default false
     this.otherQty = 0, // default 0
@@ -31,6 +33,7 @@ class Productclass {
       'retail_price': retailPrice,
       'cost_price': costPrice,
       'stock': stock,
+       'by_pieces': byPieces,
       'is_promo': isPromo,
       'other_qty': otherQty,
       'client_uuid': productClientUuid,
@@ -50,10 +53,13 @@ class Productclass {
           ? (map['cost_price'] as int).toDouble()
           : map['cost_price'],
       stock: map['stock'],
-      isPromo: map['is_promo'] ?? false,
+      isPromo: map['is_promo'] == true || map['is_promo'] == 1,
       otherQty: map['other_qty'] ?? 0,
       productClientUuid: map['client_uuid'] as String,
       type: map['type'] ?? 'add',
+      byPieces: (map['by_pieces'] ?? map['byPieces'] ?? 0) is int
+        ? (map['by_pieces'] ?? map['byPieces'] ?? 0)
+        : (map['by_pieces'] ?? map['byPieces'] ?? 0).toInt(),
     );
   }
 

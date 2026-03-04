@@ -144,7 +144,7 @@ class LocalDatabase {
         name TEXT NOT NULL,
         cost_price REAL DEFAULT 0,
         retail_price REAL DEFAULT 0,
-        by_pieces INTEGER DEFAULT 1,
+        by_pieces INTEGER DEFAULT 0,
         stock INTEGER NOT NULL,
         is_promo INTEGER DEFAULT 0,
         other_qty INTEGER DEFAULT 0,
@@ -585,8 +585,9 @@ CREATE TABLE transaction_items(
     required int id,
     required String name,
     required double retailPrice,
-    required double costPrice, // <- add this
+    required double costPrice,
     required int stock,
+    required double byPieces,
     bool isPromo = false,
     int otherQty = 0,
     String? clientUuid,
@@ -601,6 +602,7 @@ CREATE TABLE transaction_items(
         'retail_price': retailPrice,
         'cost_price': costPrice,
         'stock': stock,
+        'by_pieces': byPieces,
         'is_promo': isPromo ? 1 : 0,
         'other_qty': otherQty,
         'client_uuid': clientUuid, // <- save it
@@ -635,6 +637,7 @@ CREATE TABLE transaction_items(
 Future<void> updateProduct({
   required int id,
   required int stock,
+  required double byPieces,
   required double costPrice,
   required double retailPrice,
   required bool isPromo,
@@ -647,6 +650,7 @@ Future<void> updateProduct({
     'products',
     {
       'stock': stock,
+      'by_pieces': byPieces,
       'cost_price': costPrice,
       'retail_price': retailPrice,
       'is_promo': isPromo ? 1 : 0,
@@ -897,6 +901,7 @@ Future<int> insertTransactionItem({
     required double cost_price,
     required double retail_price, 
     required int stock,
+    required double byPieces,
     required bool isPromo,
     required int otherQty, 
     
@@ -916,6 +921,7 @@ Future<int> insertTransactionItem({
         'retail_price': retail_price,
         'stock': stock,
         'is_promo': isPromo ? 1 : 0,
+        'by_pieces': byPieces,
         'other_qty': otherQty,
         'client_uuid': clientUuid,
         'is_synced': 1,
@@ -928,6 +934,7 @@ Future<int> insertTransactionItem({
           'cost_price': cost_price,
           'retail_price': retail_price,
           'stock': stock,
+          'by_pieces': byPieces, 
           'is_promo': isPromo ? 1 : 0,
           'other_qty': otherQty,
         },
