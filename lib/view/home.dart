@@ -188,7 +188,7 @@ class _HomeState extends State<Home> {
 
             // ---------------- POS Rows ----------------
             SizedBox(
-  height: MediaQuery.of(context).size.height * 0.70,
+  height: MediaQuery.of(context).size.height * 0.60,
   child: ListView.builder(
     itemCount: posManager.rows.length,
     itemBuilder: (_, index) => posManager.buildRow(

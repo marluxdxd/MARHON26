@@ -129,7 +129,6 @@ class LocalDatabase {
   CREATE TABLE IF NOT EXISTS products_offline (
      id INTEGER PRIMARY KEY,
         name TEXT NOT NULL,
-      
         stock INTEGER NOT NULL,
         is_promo INTEGER DEFAULT 0,
         other_qty INTEGER,
@@ -142,6 +141,7 @@ class LocalDatabase {
       CREATE TABLE products(
         id INTEGER PRIMARY KEY,
         name TEXT NOT NULL,
+        barcode TEXT NOT NULL UNIQUE,
         cost_price REAL DEFAULT 0,
         retail_price REAL DEFAULT 0,
         by_pieces INTEGER DEFAULT 0,
@@ -584,6 +584,7 @@ CREATE TABLE transaction_items(
   Future<int> insertProduct({
     required int id,
     required String name,
+    required String barcode,
     required double retailPrice,
     required double costPrice,
     required int stock,
@@ -599,6 +600,7 @@ CREATE TABLE transaction_items(
       {
         'id': id,
         'name': name,
+        'barcode': barcode,
         'retail_price': retailPrice,
         'cost_price': costPrice,
         'stock': stock,

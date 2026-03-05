@@ -91,6 +91,7 @@ class ProductService {
         await localDb.insertProduct(
           id: productId,
           name: p['name'] as String,
+          barcode: p['barcode'] as String? ?? '',
           retailPrice: (p['retail_price'] as num).toDouble(),
           costPrice: (p['cost_price'] as num).toDouble(),
           // ✅ PROTECT LOCAL STOCK

@@ -1,6 +1,8 @@
 import 'package:cashier/class/productclass.dart';
 import 'package:cashier/services/product_service.dart';
+import 'package:cashier/widget/barcode.dart';
 import 'package:flutter/material.dart';
+
 
 class AddProductPage extends StatefulWidget {
   final Productclass? product;
@@ -14,7 +16,7 @@ class AddProductPage extends StatefulWidget {
 class _AddProductPageState extends State<AddProductPage> {
   double pricePerPiece = 0;
   double priceInterest = 0;
-
+  final barcodeController = TextEditingController();
   final nameController = TextEditingController();
   final costPriceController = TextEditingController();
   final byPiecesController = TextEditingController();
@@ -32,8 +34,14 @@ class _AddProductPageState extends State<AddProductPage> {
   void initState() {
     super.initState();
 
-    if (widget.product != null) {
-      final p = widget.product!;
+    /// ⭐ kung ADD PRODUCT
+  if (widget.product == null) {
+    byPiecesController.text = "1";
+  }
+
+  /// ⭐ kung EDIT PRODUCT
+  if (widget.product != null) {
+    final p = widget.product!;
 
       nameController.text = p.name;
       costPriceController.text = p.costPrice.toString();
@@ -175,6 +183,25 @@ class _AddProductPageState extends State<AddProductPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(isEdit ? "Edit Product" : "Add Product"),
+        actions: [  IconButton(
+      icon: const Icon(Icons.qr_code_scanner),
+      onPressed: () async {
+
+        final result = await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const BarcodeScannerPage(),
+          ),
+        );
+
+        if (result != null) {
+          setState(() {
+            barcodeController.text = result;
+          });
+        }
+
+      },
+    )],
       ),
 
       body: SingleChildScrollView(
@@ -189,6 +216,14 @@ class _AddProductPageState extends State<AddProductPage> {
                 setState(() => isPromo = v ?? false);
               },
             ),
+
+             /// ⭐ BARCODE FIELD
+    TextField(
+      controller: barcodeController,
+      decoration: const InputDecoration(
+        labelText: "Barcode",
+      ),
+    ),
 
             if (isPromo)
               TextField(
