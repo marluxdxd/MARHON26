@@ -1,3 +1,4 @@
+import 'package:cashier/screens/debug_db_screen.dart';
 import 'package:cashier/view/history_stock_screen.dart';
 import 'package:cashier/view/home.dart';
 import 'package:cashier/view/productview.dart';
@@ -81,7 +82,18 @@ class _AppdrawerState extends State<Appdrawer> {
               ],
             ),
           ),
-
+  IconButton(
+                  icon: const Icon(Icons.storage),
+                  tooltip: "Open DB Debug",
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const DebugDbScreen(),
+                      ),
+                    );
+                  },
+                ),
           ListTile(
             leading: Icon(Icons.home),
             title: Text("Home"),
@@ -150,6 +162,7 @@ class _AppdrawerState extends State<Appdrawer> {
                   );
                 },
               ),
+              
             ],
           ),
 

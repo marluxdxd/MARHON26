@@ -18,11 +18,11 @@ class _AddProductPageState extends State<AddProductPage> {
   double priceInterest = 0;
   final barcodeController = TextEditingController();
   final nameController = TextEditingController();
+  final stockController = TextEditingController();
   final costPriceController = TextEditingController();
   final byPiecesController = TextEditingController();
   final retailPriceController = TextEditingController();
   final promoQtyController = TextEditingController();
-
   final productService = ProductService();
 
   bool isLoading = false;
@@ -45,6 +45,7 @@ class _AddProductPageState extends State<AddProductPage> {
 
       nameController.text = p.name;
       barcodeController.text = p.barcode;
+      stockController.text = p.stock.toString();
       costPriceController.text = p.costPrice.toString();
       retailPriceController.text = p.retailPrice.toString();
       byPiecesController.text = p.byPieces.toString();
@@ -63,6 +64,7 @@ class _AddProductPageState extends State<AddProductPage> {
   void saveProduct() async {
     final name = nameController.text.trim();
     final barcode = barcodeController.text.trim();
+    final stock = int.tryParse(stockController.text.trim()) ?? 0;
     final costPrice =
         double.tryParse(costPriceController.text.trim()) ?? 0;
     final retailPrice =
@@ -97,9 +99,9 @@ class _AddProductPageState extends State<AddProductPage> {
         await productService.insertProductOffline(
           name: name,
           barcode: barcode,
+          stock: stock,
           costPrice: costPrice,
           retailPrice: retailPrice,
-          stock: 0,
           byPieces: byPieces,
           isPromo: isPromo,
           otherQty: otherQty,
@@ -242,6 +244,14 @@ class _AddProductPageState extends State<AddProductPage> {
               decoration:
                   const InputDecoration(labelText: "Product Name"),
             ),
+    TextField(
+  controller: stockController,
+  keyboardType: TextInputType.number,
+  enabled: widget.product == null, // ⭐ disable if edit
+  decoration: const InputDecoration(
+    labelText: "Stock",
+  ),
+),
 
             TextField(
               controller: costPriceController,
