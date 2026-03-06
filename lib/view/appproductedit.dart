@@ -27,6 +27,7 @@ class _AddProductPageEditState extends State<AddProductPageEdit> {
   late ConnectivityService connectivityService;
 
   late TextEditingController nameController;
+  late TextEditingController barcodeController;
   late TextEditingController costPriceController;
   late TextEditingController retailPriceController;
   late TextEditingController byPiecesController;
@@ -44,6 +45,9 @@ class _AddProductPageEditState extends State<AddProductPageEdit> {
 
     // Initialize controllers
     nameController = TextEditingController(text: widget.product['name']);
+    barcodeController = TextEditingController(
+   text: widget.product['barcode']?.toString() ?? ''
+);
     costPriceController = TextEditingController(
         text: (widget.product['cost_price'] ?? 0).toString());
     retailPriceController = TextEditingController(
@@ -119,6 +123,7 @@ class _AddProductPageEditState extends State<AddProductPageEdit> {
   /// ---------------- SAVE PRODUCT ---------------- ///
   void saveProduct() async {
     final name = nameController.text.trim();
+    final barcode = barcodeController.text.trim();
     final costPrice = double.tryParse(costPriceController.text) ?? 0;
     final retailPrice = double.tryParse(retailPriceController.text) ?? 0;
     otherQty = int.tryParse(promoQtyController.text) ?? 0;
@@ -135,6 +140,7 @@ class _AddProductPageEditState extends State<AddProductPageEdit> {
       // 1️⃣ Update locally first
       await db.updateProduct(
         id: widget.product['id'],
+        barcode: barcode,
         stock: widget.product['stock'] ?? 0,
         byPieces: widget.product['by_pieces'] ?? 0,
         costPrice: costPrice,

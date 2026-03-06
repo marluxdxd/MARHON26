@@ -120,6 +120,7 @@ class ProductService {
             (e) => Productclass(
               id: e['id'],
               name: e['name'],
+              barcode: e['barcode'] ?? '',
               retailPrice: e['retail_price'],
               costPrice: e['cost_price'],
               stock: e['stock'],
@@ -287,8 +288,7 @@ class ProductService {
             'new_stock': entry['new_stock'],
             'qty_changed': entry['qty_changed'],
             'change_type':
-                entry['type']?.toString() ??
-                'sale', // <-- must match Supabase
+                entry['type']?.toString() ?? 'sale', // <-- must match Supabase
             'trans_date':
                 entry['trans_date']?.toString() ??
                 DateTime.now().toIso8601String(),
@@ -348,6 +348,7 @@ class ProductService {
           .maybeSingle();
 
       final name = p['name']?.toString() ?? '';
+      final barcode = p['barcode']?.toString() ?? '';
       final costPrice = (p['cost_price'] as num).toDouble();
       final retailPrice = (p['retail_price'] as num).toDouble();
       final byPieces = p['by_pieces'] as int? ?? 0;
@@ -361,6 +362,7 @@ class ProductService {
             .from('products')
             .update({
               'name': name,
+              'barcode': barcode,
               'cost_price': costPrice,
               'retail_price': retailPrice,
               'stock': stock,
@@ -374,6 +376,7 @@ class ProductService {
         // ➕ Insert new product
         await supabase.from('products').insert({
           'name': name,
+          'barcode': barcode,
           'cost_price': costPrice,
           'retail_price': retailPrice,
           'stock': stock,
@@ -399,12 +402,13 @@ class ProductService {
 
   Future<int> insertProductOffline({
     required String name,
+    required String barcode,
     required double costPrice,
     required double retailPrice,
     required int stock,
     bool isPromo = false,
-    int otherQty = 0, required 
-    int byPieces,
+    int otherQty = 0,
+    required int byPieces, 
   }) async {
     final db = await localDb.database;
 
@@ -415,6 +419,7 @@ class ProductService {
     return await db.insert('products', {
       'id': generateUniqueId(prefix: "T").hashCode.abs(),
       'name': name,
+      'barcode': barcode,
       'cost_price': costPrice,
       'retail_price': retailPrice,
       'stock': stock,
@@ -670,11 +675,18 @@ class ProductService {
 
     try {
       // ----------------- PRODUCTS -----------------
+  print("SYNC START");
+  
       final supaProducts = await supabase.from('products').select();
+      //TEST
+print("SUPABASE PRODUCTS COUNT: ${supaProducts.length}");
+       //
       for (var p in supaProducts) {
+        print("SYNC PRODUCT: ${p['name']}");
         await localDb.upsertProductByClientUuid(
           clientUuid: p['client_uuid'],
           name: p['name'],
+          barcode: p['barcode'],
           cost_price: (p['cost_price'] as num).toDouble(),
           retail_price: (p['retail_price'] as num).toDouble(),
           byPieces: (p['by_pieces'] as num).toDouble(),
@@ -732,6 +744,7 @@ class ProductService {
   // CREATE
   Future<void> addProduct(
     String name,
+    String barcode,
     double costPrice,
     double retailPrice,
     int stock,
@@ -744,6 +757,7 @@ class ProductService {
 
     await supabase.from('products').insert({
       'name': name,
+      'barcode': barcode, // optional
       'cost_price': costPrice,
       'retail_price': retailPrice,
       'stock': stock,
@@ -878,13 +892,12 @@ class ProductService {
     final costPrice = (p['cost_price'] is int)
         ? (p['cost_price'] as int).toDouble()
         : (p['cost_price'] as double);
-
     final stock = p['stock'] as int;
+    final barcode = p['barcode']?.toString() ?? '';
+    final byPieces = p['by_pieces'] is int
+        ? p['by_pieces'] as int
+        : int.tryParse(p['by_pieces']?.toString() ?? '0') ?? 0;
 
-     final byPieces = p['by_pieces'] is int
-    ? p['by_pieces'] as int
-    : int.tryParse(p['by_pieces']?.toString() ?? '0') ?? 0;
-    
     final isPromo = (p['is_promo'] ?? 0) == 1;
     final otherQty = p['other_qty'] as int;
 
@@ -901,10 +914,11 @@ class ProductService {
             .from('products')
             .update({
               'name': p['name'],
+              'barcode': barcode,
               'cost_price': costPrice,
               'retail_price': retailPrice,
               'stock': stock,
-              'by_pieces': byPieces, 
+              'by_pieces': byPieces,
               'is_promo': isPromo,
               'other_qty': otherQty,
               'updated_at': DateTime.now().toIso8601String(),
@@ -915,6 +929,7 @@ class ProductService {
         // Insert new
         await supabase.from('products').insert({
           'name': p['name'],
+          'barcode': p['barcode'],
           'cost_price': costPrice,
           'retail_price': retailPrice,
           'stock': stock,
@@ -1118,4 +1133,6 @@ class ProductService {
 
     return result.isNotEmpty;
   }
+
+  Future<Object?> mapToProductClass(Map<String, Object?> first) async {}
 }

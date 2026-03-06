@@ -141,7 +141,7 @@ class LocalDatabase {
       CREATE TABLE products(
         id INTEGER PRIMARY KEY,
         name TEXT NOT NULL,
-        barcode TEXT NOT NULL UNIQUE,
+        barcode TEXT NULL,
         cost_price REAL DEFAULT 0,
         retail_price REAL DEFAULT 0,
         by_pieces INTEGER DEFAULT 0,
@@ -639,6 +639,7 @@ CREATE TABLE transaction_items(
 Future<void> updateProduct({
   required int id,
   required int stock,
+  required String barcode,
   required double byPieces,
   required double costPrice,
   required double retailPrice,
@@ -652,6 +653,7 @@ Future<void> updateProduct({
     'products',
     {
       'stock': stock,
+      'barcode': barcode,
       'by_pieces': byPieces,
       'cost_price': costPrice,
       'retail_price': retailPrice,
@@ -900,6 +902,7 @@ Future<int> insertTransactionItem({
   Future<void> upsertProductByClientUuid({
     required String clientUuid,
     required String name,
+    required String barcode,
     required double cost_price,
     required double retail_price, 
     required int stock,
@@ -910,6 +913,8 @@ Future<int> insertTransactionItem({
   }) async {
     final db = await database;
 
+    
+
     final existing = await db.query(
       'products',
       where: 'client_uuid = ?',
@@ -919,6 +924,7 @@ Future<int> insertTransactionItem({
     if (existing.isEmpty) {
       await db.insert('products', {
         'name': name,
+        'barcode': barcode,
         'cost_price': cost_price,
         'retail_price': retail_price,
         'stock': stock,
@@ -933,6 +939,7 @@ Future<int> insertTransactionItem({
         'products',
         {
           'name': name,
+          'barcode': barcode,
           'cost_price': cost_price,
           'retail_price': retail_price,
           'stock': stock,

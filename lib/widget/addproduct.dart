@@ -1,6 +1,6 @@
 import 'package:cashier/class/productclass.dart';
 import 'package:cashier/services/product_service.dart';
-import 'package:cashier/widget/barcode.dart';
+import 'package:cashier/view/barcode.dart';
 import 'package:flutter/material.dart';
 
 
@@ -44,6 +44,7 @@ class _AddProductPageState extends State<AddProductPage> {
     final p = widget.product!;
 
       nameController.text = p.name;
+      barcodeController.text = p.barcode;
       costPriceController.text = p.costPrice.toString();
       retailPriceController.text = p.retailPrice.toString();
       byPiecesController.text = p.byPieces.toString();
@@ -61,6 +62,7 @@ class _AddProductPageState extends State<AddProductPage> {
   /// ⭐ SAVE PRODUCT (CREATE + UPDATE)
   void saveProduct() async {
     final name = nameController.text.trim();
+    final barcode = barcodeController.text.trim();
     final costPrice =
         double.tryParse(costPriceController.text.trim()) ?? 0;
     final retailPrice =
@@ -94,6 +96,7 @@ class _AddProductPageState extends State<AddProductPage> {
       if (widget.product == null) {
         await productService.insertProductOffline(
           name: name,
+          barcode: barcode,
           costPrice: costPrice,
           retailPrice: retailPrice,
           stock: 0,
@@ -113,6 +116,7 @@ class _AddProductPageState extends State<AddProductPage> {
           "products",
           {
             "name": name,
+            "barcode": barcode,
             "cost_price": costPrice,
             "retail_price": retailPrice,
             "by_pieces": byPieces,

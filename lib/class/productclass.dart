@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 class Productclass {
   final int id;
   final String name;
+  final String barcode;
   final double retailPrice;
   final double costPrice;
   int stock;
@@ -15,6 +16,7 @@ class Productclass {
   Productclass({
     required this.id,
     required this.name,
+    required this.barcode,
     required this.retailPrice,
     required this.costPrice,
     required this.stock,
@@ -22,7 +24,7 @@ class Productclass {
     required this.productClientUuid, // ✅ REQUIRED
     this.isPromo = false, // default false
     this.otherQty = 0, // default 0
-    this.type = 'add',
+    this.type = 'add', 
   });
 
   // Convert to Map for Supabase insert/update
@@ -30,6 +32,7 @@ class Productclass {
     return {
       'id': id,
       'name': name,
+      'barcode': barcode,
       'retail_price': retailPrice,
       'cost_price': costPrice,
       'stock': stock,
@@ -46,6 +49,7 @@ class Productclass {
     return Productclass(
       id: map['id'],
       name: map['name'],
+      barcode: map['barcode'] ?? '',
       retailPrice: map['retail_price'] is int
           ? (map['retail_price'] as int).toDouble()
           : map['retail_price'],
