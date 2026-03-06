@@ -5,6 +5,7 @@ import 'package:cashier/services/product_service.dart';
 import 'package:cashier/services/transaction_promo_service.dart';
 import 'package:cashier/services/transaction_service.dart';
 import 'package:cashier/utils.dart';
+import 'package:cashier/view/barcode.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:cashier/class/posrowclass.dart';
@@ -15,7 +16,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 import 'dart:async';
 import '../class/pos_row_manager.dart';
-
+import 'package:cashier/services/barcode_scan_service.dart';
+import 'package:cashier/class/productclass.dart';
 // ------------------ Helper Functions ------------------
 String generateUniqueId({String prefix = "S"}) {
   return "$prefix${DateTime.now().millisecondsSinceEpoch}";
@@ -29,6 +31,7 @@ class Home extends StatefulWidget {
 }
 
 class _HomeState extends State<Home> {
+  List<Productclass> products = [];
   bool isAutoNextRowOn = true; // default OFF
   bool isSyncingOnline = false;
   bool syncSuccess = false;
@@ -49,6 +52,7 @@ class _HomeState extends State<Home> {
   void initState() {
     super.initState();
     posManager = POSRowManager(context);
+    testBarcode();
 
     // 🔹 Automatic sync on startup
     _syncOnStartup();
@@ -74,41 +78,67 @@ class _HomeState extends State<Home> {
       if (status != ConnectivityResult.none) syncProducts();
     });
   }
+Future<void> testBarcode() async {
+  final db = await LocalDatabase().database;
 
+  final result = await db.query(
+    'products',
+    where: 'barcode = ?',
+    whereArgs: ['740617261219'],
+  );
+
+  print("SQLITE RESULT: $result");
+}
   Future<void> _syncOnStartup() async {
     final online = await ProductService().isOnline1();
     if (online) {
       await ProductService().syncOnlineProducts();
     }
   }
+Future<void> scanBarcode() async {
 
+  final barcode = await Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (context) => const BarcodeScannerPage(),
+    ),
+  );
+
+  if (barcode != null) {
+    print("Scanned: $barcode");
+
+    // diri nimo pangitaon sa product list
+  }
+
+}
   Future<void> syncProducts() async {
+  if (!mounted) return;
+
+  setState(() {
+    isSyncing = true;
+    syncSuccess = false;
+    posManager.rows.clear();
+  });
+
+  try {
+    await productService.syncOfflineProducts();
+
+    products = await productService.getAllProducts();
+
     if (!mounted) return;
 
     setState(() {
-      isSyncing = true;
-      syncSuccess = false;
-      posManager.rows.clear();
+      posManager.rows = [POSRow()];
+      syncSuccess = true;
     });
 
-    try {
-      await productService.syncOfflineProducts();
-      final latestProducts = await productService.getAllProducts();
-
-      if (!mounted) return;
-
-      setState(() {
-        posManager.rows = [POSRow()]; // start empty row
-        syncSuccess = true;
-      });
-      print("Sync completed successfully!");
-    } catch (e) {
-      print("Error during product sync: $e");
-    } finally {
-      if (!mounted) return;
-      setState(() => isSyncing = false);
-    }
+  } catch (e) {
+    print("Error during product sync: $e");
+  } finally {
+    if (!mounted) return;
+    setState(() => isSyncing = false);
   }
+}
 
   @override
   void dispose() {
@@ -183,9 +213,21 @@ class _HomeState extends State<Home> {
                     fontSize: 12,
                   ),
                 ),
+
               ),
             ),
-
+ElevatedButton(
+  onPressed: () {
+    BarcodeScanService.scanBarcode(
+      context: context,
+      products: products,
+      rows: posManager.rows,
+      isAutoNextRowOn: isAutoNextRowOn,
+      refreshUI: _updateUI,
+    );
+  },
+  child: const Text("Scan Product"),
+),
             // ---------------- POS Rows ----------------
             SizedBox(
   height: MediaQuery.of(context).size.height * 0.60,
