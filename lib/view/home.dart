@@ -2,6 +2,7 @@ import 'package:cashier/database/local_db.dart';
 import 'package:cashier/database/local_db_transactionpromo.dart';
 import 'package:cashier/screens/debug_db_screen.dart';
 import 'package:cashier/services/product_service.dart';
+import 'package:cashier/services/scan_mode.dart';
 import 'package:cashier/services/transaction_promo_service.dart';
 import 'package:cashier/services/transaction_service.dart';
 import 'package:cashier/utils.dart';
@@ -102,7 +103,13 @@ class _HomeState extends State<Home> {
   Future<void> scanBarcode() async {
     final barcode = await Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => const BarcodeScannerPage()),
+MaterialPageRoute(
+  builder: (context) => BarcodeScannerPage(
+    onBarcodeScanned: (barcode) {
+      // handle scanned barcode here
+    },
+  ),
+),
     );
 
     if (barcode != null) {
@@ -231,12 +238,14 @@ Widget build(BuildContext context) {
                 ElevatedButton(
                   onPressed: () {
                     BarcodeScanService.scanBarcode(
-                      context: context,
-                      products: products,
-                      rows: posManager.rows,
-                      isAutoNextRowOn: isAutoNextRowOn,
-                      refreshUI: _updateUI,
-                    );
+  context: context,
+  products: products,
+  rows: posManager.rows,
+  isAutoNextRowOn: isAutoNextRowOn,
+  refreshUI: _updateUI,
+
+  mode: ScanMode.posSale,
+);
                   },
                   child: const Text("Scan Product"),
                 ),
@@ -255,6 +264,7 @@ Widget build(BuildContext context) {
                     ),
                   ),
                 ),
+
                 const SizedBox(height: 10),
 
                 /// TOTAL BILL
@@ -352,12 +362,14 @@ Widget build(BuildContext context) {
                     ElevatedButton(
                       onPressed: () {
                         BarcodeScanService.scanBarcode(
-                          context: context,
-                          products: products,
-                          rows: posManager.rows,
-                          isAutoNextRowOn: isAutoNextRowOn,
-                          refreshUI: _updateUI,
-                        );
+  context: context,
+  products: products,
+  rows: posManager.rows,
+  isAutoNextRowOn: isAutoNextRowOn,
+  refreshUI: _updateUI,
+
+  mode: ScanMode.posSale,
+);
                       },
                       child: const Text("Scan Product"),
                     ),

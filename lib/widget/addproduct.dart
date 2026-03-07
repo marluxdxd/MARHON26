@@ -1,8 +1,9 @@
 import 'package:cashier/class/productclass.dart';
+import 'package:cashier/services/barcode_scan_service.dart';
 import 'package:cashier/services/product_service.dart';
+import 'package:cashier/services/scan_mode.dart';
 import 'package:cashier/view/barcode.dart';
 import 'package:flutter/material.dart';
-
 
 class AddProductPage extends StatefulWidget {
   final Productclass? product;
@@ -35,16 +36,16 @@ class _AddProductPageState extends State<AddProductPage> {
     super.initState();
 
     /// ⭐ kung ADD PRODUCT
-  if (widget.product == null) {
-    byPiecesController.text = "1";
-  }
+    if (widget.product == null) {
+      byPiecesController.text = "1";
+    }
 
-  /// ⭐ kung EDIT PRODUCT
-  if (widget.product != null) {
-    final p = widget.product!;
+    /// ⭐ kung EDIT PRODUCT
+    if (widget.product != null) {
+      final p = widget.product!;
 
       nameController.text = p.name;
-      barcodeController.text = p.barcode;
+      barcodeController.text = p.barcode.toString();
       stockController.text = p.stock.toString();
       costPriceController.text = p.costPrice.toString();
       retailPriceController.text = p.retailPrice.toString();
@@ -65,27 +66,23 @@ class _AddProductPageState extends State<AddProductPage> {
     final name = nameController.text.trim();
     final barcode = barcodeController.text.trim();
     final stock = int.tryParse(stockController.text.trim()) ?? 0;
-    final costPrice =
-        double.tryParse(costPriceController.text.trim()) ?? 0;
-    final retailPrice =
-        double.tryParse(retailPriceController.text.trim()) ?? 0;
-    final byPieces =
-        int.tryParse(byPiecesController.text.trim()) ?? 0;
+    final costPrice = double.tryParse(costPriceController.text.trim()) ?? 0;
+    final retailPrice = double.tryParse(retailPriceController.text.trim()) ?? 0;
+    final byPieces = int.tryParse(byPiecesController.text.trim()) ?? 0;
 
-    otherQty =
-        int.tryParse(promoQtyController.text.trim()) ?? 0;
+    otherQty = int.tryParse(promoQtyController.text.trim()) ?? 0;
 
     if (name.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Enter product name")),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("Enter product name")));
       return;
     }
 
-    if (byPieces <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("By pieces must be > 0")),
-      );
+    if (byPieces <= -1) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("By pieces must be > -1")));
       return;
     }
 
@@ -107,7 +104,6 @@ class _AddProductPageState extends State<AddProductPage> {
           otherQty: otherQty,
         );
       }
-
       /// ⭐ UPDATE MODE
       else {
         final clientUuid = widget.product!.productClientUuid;
@@ -132,9 +128,7 @@ class _AddProductPageState extends State<AddProductPage> {
 
         /// Sync update online
         if (await productService.isOnline2()) {
-          await productService.syncSingleProductOnline(
-            widget.product!.id,
-          );
+          await productService.syncSingleProductOnline(widget.product!.id);
         }
       }
 
@@ -144,9 +138,9 @@ class _AddProductPageState extends State<AddProductPage> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(widget.product == null
-              ? "Product added"
-              : "Product updated"),
+          content: Text(
+            widget.product == null ? "Product added" : "Product updated",
+          ),
         ),
       );
 
@@ -160,22 +154,18 @@ class _AddProductPageState extends State<AddProductPage> {
 
   /// ⭐ CALCULATIONS
   void computePricePerPiece() {
-    final costPrice =
-        double.tryParse(costPriceController.text) ?? 0;
-    final pieces =
-        int.tryParse(byPiecesController.text) ?? 0;
+    final costPrice = double.tryParse(costPriceController.text) ?? 0;
+    final pieces = int.tryParse(byPiecesController.text) ?? 0;
 
     setState(() {
-      pricePerPiece =
-          pieces > 0 ? costPrice / pieces : 0;
+      pricePerPiece = pieces > 0 ? costPrice / pieces : 0;
     });
 
     computeInterest();
   }
 
   void computeInterest() {
-    final retailPrice =
-        double.tryParse(retailPriceController.text) ?? 0;
+    final retailPrice = double.tryParse(retailPriceController.text) ?? 0;
 
     setState(() {
       priceInterest = retailPrice - pricePerPiece;
@@ -189,32 +179,34 @@ class _AddProductPageState extends State<AddProductPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(isEdit ? "Edit Product" : "Add Product"),
-        actions: [  IconButton(
-      icon: const Icon(Icons.qr_code_scanner),
-      onPressed: () async {
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.qr_code_scanner),
+            onPressed: () {
+  BarcodeScanService.scanBarcode(
+    context: context,
+    products: [], // not needed for add product
+    rows: [],
+    isAutoNextRowOn: false,
+    refreshUI: () {},
 
-        final result = await Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => const BarcodeScannerPage(),
+    mode: ScanMode.addProduct,
+
+    onAddProductScan: (barcode) {
+      setState(() {
+        barcodeController.text = barcode;
+      });
+    },
+  );
+},
           ),
-        );
-
-        if (result != null) {
-          setState(() {
-            barcodeController.text = result;
-          });
-        }
-
-      },
-    )],
+        ],
       ),
 
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
-
             CheckboxListTile(
               title: const Text("Promo"),
               value: isPromo,
@@ -223,67 +215,56 @@ class _AddProductPageState extends State<AddProductPage> {
               },
             ),
 
-             /// ⭐ BARCODE FIELD
-    TextField(
-      controller: barcodeController,
-      decoration: const InputDecoration(
-        labelText: "Barcode",
-      ),
-    ),
+            /// ⭐ BARCODE FIELD
+            TextField(
+              controller: barcodeController,
+              decoration: const InputDecoration(labelText: "Barcode"),
+            ),
 
             if (isPromo)
               TextField(
                 controller: promoQtyController,
                 keyboardType: TextInputType.number,
-                decoration:
-                    const InputDecoration(labelText: "Promo Qty"),
+                decoration: const InputDecoration(labelText: "Promo Qty"),
               ),
 
             TextField(
               controller: nameController,
-              decoration:
-                  const InputDecoration(labelText: "Product Name"),
+              decoration: const InputDecoration(labelText: "Product Name"),
             ),
-    TextField(
-  controller: stockController,
-  keyboardType: TextInputType.number,
-  enabled: widget.product == null, // ⭐ disable if edit
-  decoration: const InputDecoration(
-    labelText: "Stock",
-  ),
-),
+            TextField(
+              controller: stockController,
+              keyboardType: TextInputType.number,
+              enabled: widget.product == null, // ⭐ disable if edit
+              decoration: const InputDecoration(labelText: "Stock"),
+            ),
 
             TextField(
               controller: costPriceController,
               keyboardType: TextInputType.number,
               onChanged: (_) => computePricePerPiece(),
-              decoration:
-                  const InputDecoration(labelText: "Cost Price"),
+              decoration: const InputDecoration(labelText: "Cost Price"),
             ),
 
             TextField(
               controller: byPiecesController,
               keyboardType: TextInputType.number,
               onChanged: (_) => computePricePerPiece(),
-              decoration:
-                  const InputDecoration(labelText: "By Pieces"),
+              decoration: const InputDecoration(labelText: "By Pieces"),
             ),
 
             TextField(
               controller: retailPriceController,
               keyboardType: TextInputType.number,
               onChanged: (_) => computeInterest(),
-              decoration:
-                  const InputDecoration(labelText: "Retail Price"),
+              decoration: const InputDecoration(labelText: "Retail Price"),
             ),
 
             const SizedBox(height: 15),
 
-            Text(
-                "Price per piece: ₱${pricePerPiece.toStringAsFixed(2)}"),
+            Text("Price per piece: ₱${pricePerPiece.toStringAsFixed(2)}"),
 
-            Text(
-                "Interest: ₱${priceInterest.toStringAsFixed(2)}"),
+            Text("Interest: ₱${priceInterest.toStringAsFixed(2)}"),
 
             const SizedBox(height: 25),
 

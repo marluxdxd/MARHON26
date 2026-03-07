@@ -27,6 +27,8 @@ class Productclass {
     this.type = 'add', 
   });
 
+  
+
   // Convert to Map for Supabase insert/update
   Map<String, dynamic> toMap() {
     return {
@@ -66,6 +68,8 @@ class Productclass {
         : (map['by_pieces'] ?? map['byPieces'] ?? 0).toInt(),
     );
   }
+
+  
 
   // Fetch all products from Supabase
   static Future<List<Productclass>> fetchProducts() async {

@@ -1,3 +1,4 @@
+import 'package:cashier/database/local_db.dart';
 import 'package:flutter/material.dart';
 import '../class/productclass.dart';
 import '../class/posrowclass.dart';
@@ -47,7 +48,9 @@ class POSRowManager {
 
         if (selectedProduct == null) break;
 
-        final alreadySelected = rows.any((r) => r.product?.id == selectedProduct!.id);
+        final alreadySelected = rows.any(
+          (r) => r.product?.id == selectedProduct!.id,
+        );
 
         if (alreadySelected) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -94,6 +97,129 @@ class POSRowManager {
       }
     }
   }
+
+
+
+
+
+
+
+
+Future<void> autoFillFromScannedCodes(
+  List<String> codes,
+  VoidCallback onUpdate,
+) async {
+
+  for (var code in codes) {
+
+    final product = await _findProductByBarcode(code);
+
+    if (product == null) continue;
+
+    final alreadySelected = rows.any(
+      (r) => r.product?.id == product.id,
+    );
+
+    if (alreadySelected) continue;
+
+    final row = rows.firstWhere(
+      (r) => r.product == null,
+      orElse: () {
+        addEmptyRow();
+        return rows.last;
+      },
+    );
+
+    row.product = product;
+    row.isPromo = product.isPromo;
+    row.qty = 1;
+    row.otherQty = product.otherQty;
+
+    onUpdate();
+  }
+}
+
+Future<Productclass?> _findProductByBarcode(String barcode) async {
+
+  final db = await LocalDatabase().database;
+
+  final result = await db.query(
+    'products',
+    where: 'barcode = ?',
+    whereArgs: [barcode],
+  );
+
+  if (result.isEmpty) return null;
+
+  return Productclass.fromMap(result.first);
+}
+
+
+Future<void> handleScannedBarcode(
+  String barcode,
+  VoidCallback onUpdate,
+) async {
+
+  final product = await _findProductByBarcode(barcode);
+
+  if (product == null) return;
+
+  /// 🔥 Check if product already exists
+  final existingRow = rows.firstWhere(
+    (r) => r.product?.barcode == barcode,
+    orElse: () => POSRow(),
+  );
+
+  /// If product exists → just increase qty
+  if (existingRow.product != null) {
+
+    if (existingRow.isPromo) {
+      existingRow.promo_count++;
+      existingRow.otherQty =
+          existingRow.promo_count *
+              (existingRow.product?.otherQty ?? 1);
+    } else {
+      existingRow.qty++;
+    }
+
+  } else {
+
+    /// Create new row
+    final row = rows.firstWhere(
+      (r) => r.product == null,
+      orElse: () {
+        addEmptyRow();
+        return rows.last;
+      },
+    );
+
+    row.product = product;
+    row.isPromo = product.isPromo;
+    row.qty = 1;
+    row.otherQty = product.otherQty;
+  }
+
+  onUpdate();
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
   // MINI QTY CONTROLS
   Widget _buildQuantityControls(POSRow row, VoidCallback onUpdate) {
@@ -153,7 +279,8 @@ class POSRowManager {
     }
 
     final size = MediaQuery.of(context).size;
-    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+    final isLandscape =
+        MediaQuery.of(context).orientation == Orientation.landscape;
 
     // Portrait stays untouched → Dismissible logic preserved
     final relaxLayout = isLandscape;
@@ -182,7 +309,7 @@ class POSRowManager {
                       TextButton(
                         onPressed: () => Navigator.pop(context),
                         child: const Text("Close"),
-                      )
+                      ),
                     ],
                   ),
                 );
@@ -200,12 +327,13 @@ class POSRowManager {
                   return;
                 }
 
-                final selectedProduct = await showModalBottomSheet<Productclass>(
-                  context: context,
-                  barrierColor: Colors.black.withOpacity(0.0),
-                  isScrollControlled: true,
-                  builder: (_) => Productbottomsheet(),
-                );
+                final selectedProduct =
+                    await showModalBottomSheet<Productclass>(
+                      context: context,
+                      barrierColor: Colors.black.withOpacity(0.0),
+                      isScrollControlled: true,
+                      builder: (_) => Productbottomsheet(),
+                    );
 
                 if (selectedProduct == null) return;
 
@@ -267,7 +395,9 @@ class POSRowManager {
                 ),
                 child: Text(
                   row.product?.name ?? "Select Product",
-                  overflow: isLandscape ? TextOverflow.visible : TextOverflow.ellipsis,
+                  overflow: isLandscape
+                      ? TextOverflow.visible
+                      : TextOverflow.ellipsis,
                   maxLines: 1,
                   softWrap: false,
                 ),

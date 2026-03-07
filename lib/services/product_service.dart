@@ -491,7 +491,12 @@ class ProductService {
           : p['cost_price'] is double
           ? p['cost_price'] as double
           : 0.0;
-
+      final byPieces = p['by_pieces'] is int
+          ? p['by_pieces'] as int
+          : p['by_pieces'] is double
+          ? (p['by_pieces'] as double).toInt()
+          : 0;
+          final barcode = p['barcode']?.toString() ?? '';
       final stock = p['stock'] is int ? p['stock'] as int : 0;
       final isPromo = (p['is_promo'] ?? 0) == 1;
       final otherQty = p['other_qty'] is int ? p['other_qty'] as int : 0;
@@ -510,6 +515,8 @@ class ProductService {
               .from('products')
               .update({
                 'name': p['name'],
+                'barcode': barcode,
+                'by_pieces': byPieces,
                 'cost_price': costPrice,
                 'retail_price': retailPrice,
                 'stock': stock,
@@ -522,6 +529,8 @@ class ProductService {
           // ➕ INSERT new product
           await supabase.from('products').insert({
             'name': p['name'],
+            'barcode': barcode,
+             'by_pieces': byPieces,
             'cost_price': costPrice,
             'retail_price': retailPrice,
             'stock': stock,
@@ -587,6 +596,8 @@ class ProductService {
               .from('products')
               .update({
                 'name': p['name'],
+                'barcode': p['barcode'],
+               
                 'retail_price': p['retail_price'],
                 'cost_price': p['cost_price'],
                 'stock': p['stock'],
@@ -598,6 +609,8 @@ class ProductService {
           // 3️⃣ INSERT new product with client_uuid
           await supabase.from('products').insert({
             'name': p['name'],
+            'barcode': p['barcode'],
+           
             'retail_price': p['retail_price'],
             'cost_price': p['cost_price'],
             'stock': p['stock'],
@@ -757,7 +770,7 @@ print("SUPABASE PRODUCTS COUNT: ${supaProducts.length}");
 
     await supabase.from('products').insert({
       'name': name,
-      'barcode': barcode, // optional
+      'barcode': barcode,
       'cost_price': costPrice,
       'retail_price': retailPrice,
       'stock': stock,
