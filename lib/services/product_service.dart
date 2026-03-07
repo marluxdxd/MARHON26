@@ -20,6 +20,16 @@ class ProductService {
   late final Connectivity _connectivity;
   late final StreamSubscription _connectivitySub;
 
+  final StreamController<void> productRefreshController =
+    StreamController.broadcast();
+
+Stream<void> get productRefreshStream =>
+    productRefreshController.stream;
+
+void notifyProductChanged() {
+  productRefreshController.add(null);
+}
+
   void listenToConnectivity(VoidCallback onOnline) {
     print("📡 Connectivity listener started");
 
@@ -43,6 +53,8 @@ class ProductService {
       }
     });
   }
+
+  
 
   /// Resets the 'products_id_seq' sequence to MAX(id) + 1
   Future<void> resetProductIdSequence() async {

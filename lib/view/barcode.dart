@@ -1,3 +1,4 @@
+import 'package:cashier/services/product_service.dart';
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:audioplayers/audioplayers.dart';
@@ -25,7 +26,10 @@ class _BarcodeScannerPageState extends State<BarcodeScannerPage> {
   List<Productclass> scannedList = [];
 
   final MobileScannerController controller =
-      MobileScannerController(facing: CameraFacing.back);
+      MobileScannerController(facing: CameraFacing.back,
+      torchEnabled: true,
+      
+      );
 
   final AudioPlayer player = AudioPlayer();
 
@@ -35,7 +39,7 @@ class _BarcodeScannerPageState extends State<BarcodeScannerPage> {
   @override
   void initState() {
     super.initState();
-
+_refreshLocalProducts();
     /// Scan line animation
     Future.doWhile(() async {
       await Future.delayed(const Duration(milliseconds: 16));
@@ -43,8 +47,10 @@ class _BarcodeScannerPageState extends State<BarcodeScannerPage> {
       if (!mounted) return false;
 
       setState(() {
-        scanLinePosition += 2;
-        if (scanLinePosition > 160) scanLinePosition = 0;
+        scanLinePosition += 3;
+
+        /// Match new scan box height
+        if (scanLinePosition > 220) scanLinePosition = 0;
       });
 
       return true;
@@ -76,6 +82,16 @@ class _BarcodeScannerPageState extends State<BarcodeScannerPage> {
     return Productclass.fromMap(result.first);
   }
 
+  Future<void> _refreshLocalProducts() async {
+  final productService = ProductService();
+
+  final online = await productService.isOnline1();
+
+  if (online) {
+    await productService.syncOnlineProducts();
+  }
+}
+
   /// ===============================
   /// SCAN ENGINE
   /// ===============================
@@ -102,7 +118,6 @@ class _BarcodeScannerPageState extends State<BarcodeScannerPage> {
     setState(() {
       scannedProduct = product;
 
-      /// Add to list if found
       if (product != null) {
         scannedList.add(product);
       }
@@ -110,12 +125,10 @@ class _BarcodeScannerPageState extends State<BarcodeScannerPage> {
 
     widget.onBarcodeScanned(barcode);
 
-    /// Sound
     try {
       await player.play(AssetSource('sounds/beep.mp3'));
     } catch (_) {}
 
-    /// Vibrate
     if (await Vibration.hasVibrator() ?? false) {
       Vibration.vibrate(duration: 70);
     }
@@ -127,9 +140,13 @@ class _BarcodeScannerPageState extends State<BarcodeScannerPage> {
 
   @override
   Widget build(BuildContext context) {
+
+    final boxWidth = 300.0;
+    final boxHeight = 220.0;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Supermarket Scanner"),
+        title: const Text("Scanner"),
         centerTitle: true,
       ),
 
@@ -142,25 +159,29 @@ class _BarcodeScannerPageState extends State<BarcodeScannerPage> {
             onDetect: _onDetect,
           ),
 
-          /// SCAN BOX
+          /// SCAN BOX (LARGER)
           Center(
             child: Container(
-              width: 260,
-              height: 160,
+              width: boxWidth,
+              height: boxHeight,
               decoration: BoxDecoration(
-                border: Border.all(color: Colors.green, width: 3),
-                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: Colors.green,
+                  width: 3,
+                ),
+                borderRadius: BorderRadius.circular(14),
               ),
             ),
           ),
 
-          /// LASER SCAN LINE
+          /// LASER SCAN LINE (MATCH BOX WIDTH)
           Positioned(
-            top: MediaQuery.of(context).size.height / 2 - 80 + scanLinePosition,
-            left: MediaQuery.of(context).size.width / 2 - 130,
+            top: (MediaQuery.of(context).size.height / 2 - boxHeight / 2)
+                + scanLinePosition,
+            left: (MediaQuery.of(context).size.width - boxWidth) / 2,
             child: Container(
-              width: 260,
-              height: 2,
+              width: boxWidth,
+              height: 3,
               color: Colors.red,
             ),
           ),
@@ -179,7 +200,6 @@ class _BarcodeScannerPageState extends State<BarcodeScannerPage> {
                 ),
                 child: Row(
                   children: [
-
                     const Icon(
                       Icons.inventory_2,
                       color: Colors.white,
@@ -192,7 +212,6 @@ class _BarcodeScannerPageState extends State<BarcodeScannerPage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-
                           Text(
                             scannedProduct!.name,
                             style: const TextStyle(
@@ -204,7 +223,9 @@ class _BarcodeScannerPageState extends State<BarcodeScannerPage> {
 
                           Text(
                             "Barcode: ${scannedProduct!.barcode}",
-                            style: const TextStyle(color: Colors.white70),
+                            style: const TextStyle(
+                              color: Colors.white70,
+                            ),
                           ),
 
                           Text(

@@ -1,14 +1,16 @@
 import 'package:cashier/class/productclass.dart';
-import 'package:cashier/services/barcode_scan_service.dart';
 import 'package:cashier/services/product_service.dart';
-import 'package:cashier/services/scan_mode.dart';
-import 'package:cashier/view/barcode.dart';
 import 'package:flutter/material.dart';
 
 class AddProductPage extends StatefulWidget {
   final Productclass? product;
+  final String? barcode;
 
-  const AddProductPage({super.key, this.product});
+  const AddProductPage({
+    super.key,
+    this.product,
+    this.barcode,
+  });
 
   @override
   State<AddProductPage> createState() => _AddProductPageState();
@@ -17,6 +19,7 @@ class AddProductPage extends StatefulWidget {
 class _AddProductPageState extends State<AddProductPage> {
   double pricePerPiece = 0;
   double priceInterest = 0;
+
   final barcodeController = TextEditingController();
   final nameController = TextEditingController();
   final stockController = TextEditingController();
@@ -24,28 +27,33 @@ class _AddProductPageState extends State<AddProductPage> {
   final byPiecesController = TextEditingController();
   final retailPriceController = TextEditingController();
   final promoQtyController = TextEditingController();
+
   final productService = ProductService();
 
   bool isLoading = false;
   bool isPromo = false;
   int otherQty = 0;
 
-  /// ⭐ INIT EDIT MODE
   @override
   void initState() {
     super.initState();
 
-    /// ⭐ kung ADD PRODUCT
+    /// ⭐ ADD MODE DEFAULT VALUES
     if (widget.product == null) {
       byPiecesController.text = "1";
+
+      /// ⭐ If barcode came from scanner
+      if (widget.barcode != null) {
+        barcodeController.text = widget.barcode!;
+      }
     }
 
-    /// ⭐ kung EDIT PRODUCT
+    /// ⭐ EDIT MODE
     if (widget.product != null) {
       final p = widget.product!;
 
       nameController.text = p.name;
-      barcodeController.text = p.barcode.toString();
+      barcodeController.text = p.barcode ?? "";
       stockController.text = p.stock.toString();
       costPriceController.text = p.costPrice.toString();
       retailPriceController.text = p.retailPrice.toString();
@@ -61,28 +69,21 @@ class _AddProductPageState extends State<AddProductPage> {
     }
   }
 
-  /// ⭐ SAVE PRODUCT (CREATE + UPDATE)
+  /// ===============================
+  /// SAVE PRODUCT
+  /// ===============================
   void saveProduct() async {
     final name = nameController.text.trim();
     final barcode = barcodeController.text.trim();
-    final stock = int.tryParse(stockController.text.trim()) ?? 0;
-    final costPrice = double.tryParse(costPriceController.text.trim()) ?? 0;
-    final retailPrice = double.tryParse(retailPriceController.text.trim()) ?? 0;
-    final byPieces = int.tryParse(byPiecesController.text.trim()) ?? 0;
-
-    otherQty = int.tryParse(promoQtyController.text.trim()) ?? 0;
+    final stock = int.tryParse(stockController.text) ?? 0;
+    final costPrice = double.tryParse(costPriceController.text) ?? 0;
+    final retailPrice = double.tryParse(retailPriceController.text) ?? 0;
+    final byPieces = int.tryParse(byPiecesController.text) ?? 1;
+    otherQty = int.tryParse(promoQtyController.text) ?? 0;
 
     if (name.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("Enter product name")));
-      return;
-    }
-
-    if (byPieces <= -1) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("By pieces must be > -1")));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text("Enter product name")));
       return;
     }
 
@@ -104,6 +105,7 @@ class _AddProductPageState extends State<AddProductPage> {
           otherQty: otherQty,
         );
       }
+
       /// ⭐ UPDATE MODE
       else {
         final clientUuid = widget.product!.productClientUuid;
@@ -126,36 +128,45 @@ class _AddProductPageState extends State<AddProductPage> {
           whereArgs: [clientUuid],
         );
 
-        /// Sync update online
         if (await productService.isOnline2()) {
           await productService.syncSingleProductOnline(widget.product!.id);
         }
       }
 
+      /// ⭐ Sync if online
       if (online) {
+        productService.notifyProductChanged();
         await productService.syncOnlineProducts();
       }
+
+      if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            widget.product == null ? "Product added" : "Product updated",
+            widget.product == null
+                ? "Product added successfully"
+                : "Product updated successfully",
           ),
         ),
       );
 
-      Navigator.pop(context);
+      if (mounted) Navigator.pop(context);
     } catch (e) {
-      print(e);
+      debugPrint(e.toString());
     }
 
-    setState(() => isLoading = false);
+    if (mounted) {
+      setState(() => isLoading = false);
+    }
   }
 
-  /// ⭐ CALCULATIONS
+  /// ===============================
+  /// CALCULATIONS
+  /// ===============================
   void computePricePerPiece() {
     final costPrice = double.tryParse(costPriceController.text) ?? 0;
-    final pieces = int.tryParse(byPiecesController.text) ?? 0;
+    final pieces = int.tryParse(byPiecesController.text) ?? 1;
 
     setState(() {
       pricePerPiece = pieces > 0 ? costPrice / pieces : 0;
@@ -172,6 +183,9 @@ class _AddProductPageState extends State<AddProductPage> {
     });
   }
 
+  /// ===============================
+  /// UI
+  /// ===============================
   @override
   Widget build(BuildContext context) {
     final isEdit = widget.product != null;
@@ -179,28 +193,7 @@ class _AddProductPageState extends State<AddProductPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(isEdit ? "Edit Product" : "Add Product"),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.qr_code_scanner),
-            onPressed: () {
-  BarcodeScanService.scanBarcode(
-    context: context,
-    products: [], // not needed for add product
-    rows: [],
-    isAutoNextRowOn: false,
-    refreshUI: () {},
-
-    mode: ScanMode.addProduct,
-
-    onAddProductScan: (barcode) {
-      setState(() {
-        barcodeController.text = barcode;
-      });
-    },
-  );
-},
-          ),
-        ],
+        iconTheme: const IconThemeData(color: Colors.black),
       ),
 
       body: SingleChildScrollView(
@@ -215,7 +208,6 @@ class _AddProductPageState extends State<AddProductPage> {
               },
             ),
 
-            /// ⭐ BARCODE FIELD
             TextField(
               controller: barcodeController,
               decoration: const InputDecoration(labelText: "Barcode"),
@@ -232,10 +224,11 @@ class _AddProductPageState extends State<AddProductPage> {
               controller: nameController,
               decoration: const InputDecoration(labelText: "Product Name"),
             ),
+
             TextField(
               controller: stockController,
               keyboardType: TextInputType.number,
-              enabled: widget.product == null, // ⭐ disable if edit
+              enabled: widget.product == null,
               decoration: const InputDecoration(labelText: "Stock"),
             ),
 
@@ -263,7 +256,6 @@ class _AddProductPageState extends State<AddProductPage> {
             const SizedBox(height: 15),
 
             Text("Price per piece: ₱${pricePerPiece.toStringAsFixed(2)}"),
-
             Text("Interest: ₱${priceInterest.toStringAsFixed(2)}"),
 
             const SizedBox(height: 25),
