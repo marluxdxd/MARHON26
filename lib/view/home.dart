@@ -84,7 +84,9 @@ class _HomeState extends State<Home> {
 
   Future<void> syncProducts() async {
     if (!mounted) return;
-
+for (var p in products) {
+  print("${p.name} -> ${p.retailPrice}");
+}
     setState(() {
       isSyncing = true;
       syncSuccess = false;
@@ -92,16 +94,18 @@ class _HomeState extends State<Home> {
     });
 
     try {
-      await productService.syncOfflineProducts();
+    await productService.syncOfflineProducts();
 
-      products = await productService.getAllProducts();
+products = await productService.getAllProducts();
 
-      if (!mounted) return;
+BarcodeScanService.buildBarcodeCache(products);
 
-      setState(() {
-        posManager.rows = [POSRow()];
-        syncSuccess = true;
-      });
+if (!mounted) return;
+
+setState(() {
+  posManager.rows = [POSRow()];
+  syncSuccess = true;
+});
     } catch (e) {
       print("Error during product sync: $e");
     } finally {

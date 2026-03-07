@@ -115,6 +115,11 @@ _refreshLocalProducts();
 
     final product = await _findProduct(barcode);
 
+if (product != null) {
+  debugPrint("PRODUCT FOUND: ${product.name}");
+  debugPrint("PRICE: ${product.retailPrice}");
+}
+
     setState(() {
       scannedProduct = product;
 

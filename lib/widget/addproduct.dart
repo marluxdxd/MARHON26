@@ -1,4 +1,5 @@
 import 'package:cashier/class/productclass.dart';
+import 'package:cashier/services/barcode_scan_service.dart';
 import 'package:cashier/services/product_service.dart';
 import 'package:flutter/material.dart';
 
@@ -37,6 +38,15 @@ class _AddProductPageState extends State<AddProductPage> {
   @override
   void initState() {
     super.initState();
+
+    if (widget.product == null) {
+  byPiecesController.text = "1";
+
+  /// If barcode came from scanner
+  if (widget.barcode != null) {
+    barcodeController.text = widget.barcode!;
+  }
+}
 
     /// ⭐ ADD MODE DEFAULT VALUES
     if (widget.product == null) {
@@ -135,9 +145,13 @@ class _AddProductPageState extends State<AddProductPage> {
 
       /// ⭐ Sync if online
       if (online) {
-        productService.notifyProductChanged();
-        await productService.syncOnlineProducts();
-      }
+  productService.notifyProductChanged();
+  await productService.syncOnlineProducts();
+}
+
+/// ⭐ REFRESH BARCODE CACHE
+final products = await productService.getProducts();
+BarcodeScanService.buildBarcodeCache(products);
 
       if (!mounted) return;
 
@@ -208,10 +222,11 @@ class _AddProductPageState extends State<AddProductPage> {
               },
             ),
 
-            TextField(
-              controller: barcodeController,
-              decoration: const InputDecoration(labelText: "Barcode"),
-            ),
+          TextField(
+  controller: barcodeController,
+  readOnly: widget.barcode != null,
+  decoration: const InputDecoration(labelText: "Barcode"),
+),
 
             if (isPromo)
               TextField(

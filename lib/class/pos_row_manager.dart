@@ -149,28 +149,30 @@ Future<Productclass?> _findProductByBarcode(String barcode) async {
     whereArgs: [barcode],
   );
 
+  print("SCAN BARCODE: $barcode");
+  print("DB RESULT: $result");
+
   if (result.isEmpty) return null;
 
-  return Productclass.fromMap(result.first);
+  final product = Productclass.fromMap(result.first);
+
+  print("PRODUCT NAME: ${product.name}");
+  print("PRODUCT PRICE: ${product.retailPrice}");
+
+  return product;
 }
 
 
 Future<void> handleScannedBarcode(
-  String barcode,
+  Productclass product,
   VoidCallback onUpdate,
 ) async {
 
-  final product = await _findProductByBarcode(barcode);
-
-  if (product == null) return;
-
-  /// 🔥 Check if product already exists
   final existingRow = rows.firstWhere(
-    (r) => r.product?.barcode == barcode,
+    (r) => r.product?.id == product.id,
     orElse: () => POSRow(),
   );
 
-  /// If product exists → just increase qty
   if (existingRow.product != null) {
 
     if (existingRow.isPromo) {
@@ -184,7 +186,6 @@ Future<void> handleScannedBarcode(
 
   } else {
 
-    /// Create new row
     final row = rows.firstWhere(
       (r) => r.product == null,
       orElse: () {
@@ -272,6 +273,12 @@ Future<void> handleScannedBarcode(
     required bool isAutoNextRowOn,
   }) {
     double displayPrice = 0;
+
+print("BUILD ROW PRODUCT: ${row.product?.name}");
+print("BUILD ROW PRICE: ${row.product?.retailPrice}");
+print("QTY: ${row.qty}");
+print("PROMO COUNT: ${row.promo_count}");
+
     if (row.product != null) {
       displayPrice = row.isPromo
           ? row.product!.retailPrice * row.promo_count

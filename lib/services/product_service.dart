@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:cashier/class/productclass.dart';
 import 'package:cashier/database/local_db.dart';
 import 'package:cashier/database/supabase.dart';
+import 'package:cashier/services/barcode_scan_service.dart';
 import 'package:cashier/services/sync_service.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
@@ -53,8 +54,78 @@ void notifyProductChanged() {
       }
     });
   }
+  Future<void> updateProductBarcode(int id, String barcode) async {
+  final db = await localDb.database;
 
-  
+  // 1️⃣ Update Local Product
+  await db.update(
+    "products",
+    {
+      "barcode": barcode,
+      "is_synced": 0,
+      "updated_at": DateTime.now().toIso8601String(),
+    },
+    where: "id = ?",
+    whereArgs: [id],
+  );
+
+  // 2️⃣ Try Sync Immediately If Online
+  try {
+    final product = await db.query(
+      "products",
+      where: "id = ?",
+      whereArgs: [id],
+    );
+
+    if (product.isNotEmpty) {
+      final p = product.first;
+      final clientUuid = p['client_uuid']?.toString();
+
+      if (clientUuid != null && clientUuid.isNotEmpty) {
+        await supabase
+            .from("products")
+            .update({
+              "barcode": barcode,
+              "updated_at": DateTime.now().toIso8601String(),
+            })
+            .eq("client_uuid", clientUuid);
+      }
+    }
+  } catch (e) {
+    print("Barcode sync failed: $e");
+  }
+
+  // 3️⃣ Refresh Cache + Notify UI
+  final products = await getAllProducts();
+  BarcodeScanService.buildBarcodeCache(products);
+
+  notifyProductChanged();
+}
+
+  Future<List<Productclass>> findProductWithoutBarcode() async {
+  final db = await localDb.database;
+
+  final result = await db.query(
+    "products",
+    where: "barcode IS NULL OR barcode = ''",
+  );
+
+  return result.map((e) => Productclass.fromMap(e)).toList();
+}
+
+  Future<Productclass?> findProductByBarcode(String barcode) async {
+  final db = await localDb.database;
+
+  final result = await db.query(
+    "products",
+    where: "barcode = ?",
+    whereArgs: [barcode],
+  );
+
+  if (result.isEmpty) return null;
+
+  return Productclass.fromMap(result.first);
+}
 
   /// Resets the 'products_id_seq' sequence to MAX(id) + 1
   Future<void> resetProductIdSequence() async {
@@ -792,12 +863,26 @@ print("SUPABASE PRODUCTS COUNT: ${supaProducts.length}");
       'client_uuid': clientUuid,
     });
   }
+  
 
-  // READ
-  Future<List<Map<String, dynamic>>> getProducts() async {
-    final data = await supabase.from('products').select();
-    return List<Map<String, dynamic>>.from(data);
-  }
+Future<List<Productclass>> getProducts() async {
+  final data = await supabase.from('products').select();
+
+  return (data as List).map((p) {
+    return Productclass(
+      id: p['id'] ?? 0,
+      name: (p['name'] ?? '').toString(),
+      barcode: (p['barcode'] ?? '').toString(),
+      stock: p['stock'] ?? 0,
+      costPrice: (p['costPrice'] ?? 0).toDouble(),
+      retailPrice: (p['retailPrice'] ?? 0).toDouble(),
+      byPieces: p['byPieces'] ?? 1,
+      isPromo: p['isPromo'] ?? false,
+      otherQty: p['otherQty'] ?? 0,
+      productClientUuid: (p['productClientUuid'] ?? '').toString(),
+    );
+  }).toList();
+}
 
   // UPDATE
   Future<void> updateStock(int id, int newStock) async {
