@@ -335,21 +335,46 @@ setState(() {
       ),
       drawer: Appdrawer(),
 
-      // ------------------- GCASH STYLE BARCODE CENTER BUTTON -------------------
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: Colors.white,
-        onPressed: () {
-          BarcodeScanService.scanBarcode(
-            context: context,
-            products: products,
-            rows: posManager.rows,
-            isAutoNextRowOn: isAutoNextRowOn,
-            refreshUI: _updateUI,
-            mode: ScanMode.posSale,
-          );
-        },
-        child: const Icon(Icons.qr_code_scanner, size: 26, color: Colors.black),
+     // ------------------- GCASH STYLE BARCODE CENTER BUTTON -------------------
+    floatingActionButton: Transform.translate(
+        offset: const Offset(0, 22), // move slightly down if needed
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            FloatingActionButton(
+              backgroundColor: Colors.white,
+              onPressed: () {
+                BarcodeScanService.scanBarcode(
+                  context: context,
+                  products: products,
+                  rows: posManager.rows,
+                  isAutoNextRowOn: isAutoNextRowOn,
+                  refreshUI: _updateUI,
+                  mode: ScanMode.posSale,
+                );
+              },
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16), // rounded corners
+                side: const BorderSide(
+                  color: Colors.blue, // border color
+                  width: 2,          // border thickness
+                ),
+              ),
+              child: const Icon(Icons.qr_code_scanner_sharp, size: 30, color: Colors.black),
+            ),
+            const SizedBox(height: 4), // spacing between icon and text
+            const Text(
+              "Barcode",
+              style: TextStyle(
+                fontSize: 9,
+              
+                color: Colors.black,
+              ),
+            ),
+          ],
+        ),
       ),
+
 
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
 

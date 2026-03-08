@@ -47,27 +47,21 @@ class Productclass {
   }
 
   // Convert Supabase row → Productclass
-  factory Productclass.fromMap(Map<String, dynamic> map) {
-    return Productclass(
-      id: map['id'],
-      name: map['name'],
-      barcode: map['barcode'] ?? '',
-      retailPrice: map['retail_price'] is int
-          ? (map['retail_price'] as int).toDouble()
-          : map['retail_price'],
-      costPrice: map['cost_price'] is int
-          ? (map['cost_price'] as int).toDouble()
-          : map['cost_price'],
-      stock: map['stock'],
-      isPromo: map['is_promo'] == true || map['is_promo'] == 1,
-      otherQty: map['other_qty'] ?? 0,
-      productClientUuid: map['client_uuid'] as String,
-      type: map['type'] ?? 'add',
-      byPieces: (map['by_pieces'] ?? map['byPieces'] ?? 0) is int
-        ? (map['by_pieces'] ?? map['byPieces'] ?? 0)
-        : (map['by_pieces'] ?? map['byPieces'] ?? 0).toInt(),
-    );
-  }
+ factory Productclass.fromMap(Map<String, dynamic> map) {
+  return Productclass(
+    id: map['id'],
+    name: map['name'],
+    barcode: map['barcode'] ?? '',
+    retailPrice: double.tryParse(map['retail_price'].toString()) ?? 0,
+    costPrice: double.tryParse(map['cost_price'].toString()) ?? 0,
+    stock: map['stock'],
+    isPromo: map['is_promo'] == true || map['is_promo'] == 1,
+    otherQty: map['other_qty'] ?? 0,
+    productClientUuid: map['client_uuid'] as String,
+    type: map['type'] ?? 'add',
+    byPieces: int.tryParse(map['by_pieces'].toString()) ?? 0,
+  );
+}
 
   
 

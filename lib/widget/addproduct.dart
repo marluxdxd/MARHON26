@@ -4,8 +4,8 @@ import 'package:cashier/services/product_service.dart';
 import 'package:flutter/material.dart';
 
 class AddProductPage extends StatefulWidget {
-  final Productclass? product;
-  final String? barcode;
+  final Productclass? product; // existing product for edit
+  final String? barcode;       // scanned barcode
 
   const AddProductPage({
     super.key,
@@ -38,38 +38,27 @@ class _AddProductPageState extends State<AddProductPage> {
   @override
   void initState() {
     super.initState();
-
-    if (widget.product == null) {
-  byPiecesController.text = "1";
-
-  /// If barcode came from scanner
-  if (widget.barcode != null) {
-    barcodeController.text = widget.barcode!;
+ if (widget.product != null) {
+    print("PRODUCT EDIT MODE");
+    print("CostPrice: ${widget.product!.costPrice}");
+    print("RetailPrice: ${widget.product!.retailPrice}");
   }
-}
-
-    /// ⭐ ADD MODE DEFAULT VALUES
+    // Add mode defaults
     if (widget.product == null) {
       byPiecesController.text = "1";
-
-      /// ⭐ If barcode came from scanner
-      if (widget.barcode != null) {
-        barcodeController.text = widget.barcode!;
-      }
+      if (widget.barcode != null) barcodeController.text = widget.barcode!;
     }
 
-    /// ⭐ EDIT MODE
+    // Edit mode: pre-fill fields with selected product
     if (widget.product != null) {
       final p = widget.product!;
-
       nameController.text = p.name;
-      barcodeController.text = p.barcode ?? "";
+      barcodeController.text = widget.barcode ?? p.barcode ?? "";
       stockController.text = p.stock.toString();
       costPriceController.text = p.costPrice.toString();
       retailPriceController.text = p.retailPrice.toString();
       byPiecesController.text = p.byPieces.toString();
       promoQtyController.text = p.otherQty.toString();
-
       isPromo = p.isPromo;
 
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -102,8 +91,8 @@ class _AddProductPageState extends State<AddProductPage> {
     try {
       final online = await productService.isOnline1();
 
-      /// ⭐ CREATE MODE
       if (widget.product == null) {
+        // ⭐ CREATE MODE
         await productService.insertProductOffline(
           name: name,
           barcode: barcode,
@@ -114,12 +103,9 @@ class _AddProductPageState extends State<AddProductPage> {
           isPromo: isPromo,
           otherQty: otherQty,
         );
-      }
-
-      /// ⭐ UPDATE MODE
-      else {
+      } else {
+        // ⭐ UPDATE MODE
         final clientUuid = widget.product!.productClientUuid;
-
         final db = await productService.localDb.database;
 
         await db.update(
@@ -138,24 +124,40 @@ class _AddProductPageState extends State<AddProductPage> {
           whereArgs: [clientUuid],
         );
 
+        // ⭐ UPDATE CACHE
+        BarcodeScanService.updateProductCache(
+          Productclass(
+            id: widget.product!.id,
+            productClientUuid: widget.product!.productClientUuid,
+            name: name,
+            barcode: barcode,
+            stock: stock,
+            costPrice: costPrice,
+            retailPrice: retailPrice,
+            byPieces: byPieces,
+            isPromo: isPromo,
+            otherQty: otherQty,
+          ),
+        );
+
+        // ⭐ Optional: sync online if connected
         if (await productService.isOnline2()) {
           await productService.syncSingleProductOnline(widget.product!.id);
         }
       }
 
-      /// ⭐ Sync if online
-    if (online) {
-  productService.notifyProductChanged();
+      // ⭐ Sync all products if online
+      if (online) {
+        productService.notifyProductChanged();
+        await productService.syncOnlineProducts();
 
-  /// Force full sync + reload cache
-  await productService.syncOnlineProducts();
-  final products = await productService.getAllProducts();
-  BarcodeScanService.buildBarcodeCache(products);
-}
+        final products = await productService.getAllProducts();
+        BarcodeScanService.buildBarcodeCache(products);
+      }
 
-/// ⭐ REFRESH BARCODE CACHE
-final products = await productService.getProducts();
-BarcodeScanService.buildBarcodeCache(products);
+      // ⭐ Refresh barcode cache (local)
+      final products = await productService.getProducts();
+      BarcodeScanService.buildBarcodeCache(products);
 
       if (!mounted) return;
 
@@ -171,12 +173,10 @@ BarcodeScanService.buildBarcodeCache(products);
 
       if (mounted) Navigator.pop(context);
     } catch (e) {
-      debugPrint(e.toString());
+      debugPrint("SAVE PRODUCT ERROR: $e");
     }
 
-    if (mounted) {
-      setState(() => isLoading = false);
-    }
+    if (mounted) setState(() => isLoading = false);
   }
 
   /// ===============================
@@ -213,7 +213,6 @@ BarcodeScanService.buildBarcodeCache(products);
         title: Text(isEdit ? "Edit Product" : "Add Product"),
         iconTheme: const IconThemeData(color: Colors.black),
       ),
-
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
@@ -221,16 +220,14 @@ BarcodeScanService.buildBarcodeCache(products);
             CheckboxListTile(
               title: const Text("Promo"),
               value: isPromo,
-              onChanged: (v) {
-                setState(() => isPromo = v ?? false);
-              },
+              onChanged: (v) => setState(() => isPromo = v ?? false),
             ),
 
-          TextField(
-  controller: barcodeController,
-  readOnly: widget.barcode != null,
-  decoration: const InputDecoration(labelText: "Barcode"),
-),
+            TextField(
+              controller: barcodeController,
+              readOnly: widget.barcode != null,
+              decoration: const InputDecoration(labelText: "Barcode"),
+            ),
 
             if (isPromo)
               TextField(
@@ -273,10 +270,8 @@ BarcodeScanService.buildBarcodeCache(products);
             ),
 
             const SizedBox(height: 15),
-
             Text("Price per piece: ₱${pricePerPiece.toStringAsFixed(2)}"),
             Text("Interest: ₱${priceInterest.toStringAsFixed(2)}"),
-
             const SizedBox(height: 25),
 
             ElevatedButton(

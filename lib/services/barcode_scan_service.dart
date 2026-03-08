@@ -9,28 +9,29 @@ import '../services/product_service.dart';
 class BarcodeScanService {
   /// ⭐ SUPER FAST LOOKUP CACHE
   static Map<String, Productclass> _barcodeMap = {};
-static Future<void> refreshProductData({
-  required ProductService productService,
-  required List<POSRow> rows,
-}) async {
 
-  final newProducts = await productService.getAllProducts();
+  static Future<void> refreshProductData({
+    required ProductService productService,
+    required List<POSRow> rows,
+  }) async {
+    final newProducts = await productService.getAllProducts();
 
-  /// Rebuild cache
-  buildBarcodeCache(newProducts);
+    /// Rebuild cache
+    buildBarcodeCache(newProducts);
 
-  /// Update POS row product references
-  for (var row in rows) {
-    if (row.product == null) continue;
+    /// Update POS row product references
+    for (var row in rows) {
+      if (row.product == null) continue;
 
-    final updatedProduct = newProducts.firstWhere(
-      (p) => p.id == row.product!.id,
-      orElse: () => row.product!,
-    );
+      final updatedProduct = newProducts.firstWhere(
+        (p) => p.id == row.product!.id,
+        orElse: () => row.product!,
+      );
 
-    row.product = updatedProduct;
+      row.product = updatedProduct;
+    }
   }
-}
+
   /// ===============================
   /// BUILD CACHE
   /// ===============================
@@ -46,7 +47,18 @@ static Future<void> refreshProductData({
   }
 
   static Productclass? getProduct(String barcode) {
-    return _barcodeMap[barcode];
+    return _barcodeMap[barcode.trim()];
+  }
+
+  /// ⭐ ADD THIS
+  static void updateProductCache(Productclass product) {
+    final barcode = product.barcode?.trim();
+
+    if (barcode == null || barcode.isEmpty) return;
+
+    _barcodeMap[barcode] = product;
+
+    debugPrint("CACHE UPDATED FOR BARCODE: $barcode");
   }
 
   /// ===============================
@@ -132,84 +144,68 @@ static Future<void> refreshProductData({
                           Navigator.pop(context); // close scanner
 
                           await Navigator.push(
-  context,
-  MaterialPageRoute(
-    builder: (_) =>
-        AddProductPage(barcode: cleanBarcode),
-  ),
-);
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  AddProductPage(barcode: cleanBarcode),
+                            ),
+                          );
 
-/// ⭐ REFRESH AFTER ADD PRODUCT
-await BarcodeScanService.refreshProductData(
-  productService: productService,
-  rows: rows,
-);
+                          /// ⭐ REFRESH AFTER ADD PRODUCT
+                          await BarcodeScanService.refreshProductData(
+                            productService: productService,
+                            rows: rows,
+                          );
 
-refreshUI();
+                          refreshUI();
                         },
                         child: const Text("Add New Product"),
                       ),
 
                       /// ⭐ UPDATE EXISTING PRODUCT (SEARCH PRODUCT FIRST)
                       ElevatedButton(
-                        onPressed: () async {
-                          Navigator.pop(context); // close dialog
-                          Navigator.pop(context); // close scanner
+  onPressed: () async {
+    Navigator.pop(context); // close dialog
+    Navigator.pop(context); // close scanner
 
-                          final selectedProduct =
-                              await Navigator.push<Productclass>(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => ProductSearchSelectionPage(),
-                                ),
-                              );
+    // Select product to update
+    final selectedProduct = await Navigator.push<Productclass>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const ProductSearchSelectionPage(),
+      ),
+    );
 
-                          if (selectedProduct != null) {
-                            await productService.updateProductBarcode(
-                              selectedProduct.id,
-                              cleanBarcode,
-                            );
+    if (selectedProduct != null) {
+      // Open AddProductPage pre-filled with selected product + scanned barcode
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => AddProductPage(
+            product: selectedProduct,
+            barcode: cleanBarcode, // pass scanned barcode
+          ),
+        ),
+      );
 
-                            // ⭐ Reload products
-                            final newProducts = await productService
-                                .getAllProducts();
+      // Refresh data and cache
+      final productService = ProductService();
+      await BarcodeScanService.refreshProductData(
+        productService: productService,
+        rows: rows,
+      );
 
-                            BarcodeScanService.buildBarcodeCache(newProducts);
+      refreshUI();
 
-                            // Force refresh POS rows product references
-                            for (var row in rows) {
-                              if (row.product != null) {
-                                final updatedProduct = newProducts.firstWhere(
-                                  (p) => p.id == row.product!.id,
-                                  orElse: () => row.product!,
-                                );
-
-                                row.product = updatedProduct;
-                              }
-                            }
-
-                            refreshUI();
-
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text("Barcode updated successfully"),
-                              ),
-                            );
-                            // Refresh cache
-                            BarcodeScanService.buildBarcodeCache(
-                              await productService.getProducts(),
-                            );
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  "Barcode added to ${selectedProduct.name}",
-                                ),
-                              ),
-                            );
-                          }
-                        },
-                        child: const Text("Update Existing Product"),
-                      ),
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Product updated successfully"),
+        ),
+      );
+    }
+  },
+  child: const Text("Update Existing Product"),
+),
                     ],
                   );
                 },
@@ -333,6 +329,7 @@ class _ProductSearchSelectionPageState
                   title: Text(product.name),
                   subtitle: Text("Barcode: ${product.barcode ?? 'No barcode'}"),
                   onTap: () {
+                    // Close the search selection page and return the selected product
                     Navigator.pop(context, product);
                   },
                 );

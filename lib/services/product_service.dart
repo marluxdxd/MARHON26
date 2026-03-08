@@ -874,12 +874,12 @@ Future<List<Productclass>> getProducts() async {
       name: (p['name'] ?? '').toString(),
       barcode: (p['barcode'] ?? '').toString(),
       stock: p['stock'] ?? 0,
-      costPrice: (p['costPrice'] ?? 0).toDouble(),
-      retailPrice: (p['retailPrice'] ?? 0).toDouble(),
-      byPieces: p['byPieces'] ?? 1,
-      isPromo: p['isPromo'] ?? false,
-      otherQty: p['otherQty'] ?? 0,
-      productClientUuid: (p['productClientUuid'] ?? '').toString(),
+      costPrice: (p['cost_price'] ?? 0).toDouble(),
+      retailPrice: (p['retail_price'] ?? 0).toDouble(),
+      byPieces: p['by_pieces'] ?? 1,
+      isPromo: p['is_promo'] ?? false,
+      otherQty: p['other_qty'] ?? 0,
+      productClientUuid: (p['client_uuid'] ?? '').toString(),
     );
   }).toList();
 }

@@ -3,6 +3,7 @@ import 'package:cashier/widget/addproduct.dart';
 import 'package:cashier/class/productclass.dart';
 import 'package:cashier/services/product_service.dart';
 import 'package:cashier/widget/bottom_nav_bar.dart';
+
 class Productview extends StatefulWidget {
   const Productview({super.key});
 
@@ -12,31 +13,29 @@ class Productview extends StatefulWidget {
 
 class _ProductviewState extends State<Productview> {
   final ProductService _productService = ProductService();
-final ScrollController _scrollController = ScrollController();
+  final ScrollController _scrollController = ScrollController();
   List<Productclass> _products = [];
   List<Productclass> _filteredProducts = [];
   bool _isLoading = true;
   final searchController = TextEditingController();
 
-
   void updateLocalProduct(Productclass updatedProduct) {
-  final index = _products.indexWhere(
-      (p) => p.id == updatedProduct.id);
+    final index = _products.indexWhere((p) => p.id == updatedProduct.id);
 
-  if (index != -1) {
-    setState(() {
-      _products[index] = updatedProduct;
-      _filteredProducts = List.from(_products);
-    });
+    if (index != -1) {
+      setState(() {
+        _products[index] = updatedProduct;
+        _filteredProducts = List.from(_products);
+      });
+    }
   }
-}
-  
-@override
-void dispose() {
-  _scrollController.dispose();
-  searchController.dispose();
-  super.dispose();
-}
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    searchController.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -59,6 +58,7 @@ void dispose() {
       setState(() {
         _products = products;
         _filteredProducts = products;
+        sortProductsAlphabetically();
       });
     } catch (e) {
       print("Load error: $e");
@@ -73,11 +73,27 @@ void dispose() {
     final filtered = _products.where((p) {
       return p.name.toLowerCase().contains(query.toLowerCase());
     }).toList();
-
+    _filteredProducts = filtered;
+ sortProductsAlphabetically();
     setState(() => _filteredProducts = filtered);
   }
 
   /// ---------------- DELETE PRODUCT (POS SAFE) ----------------
+
+
+/// ---------------- SORT ALPHABETICALLY ----------------
+void sortProductsAlphabetically() {
+  _filteredProducts.sort((a, b) {
+    String firstWordA = a.name.split(' ').first.toLowerCase();
+    String firstWordB = b.name.split(' ').first.toLowerCase();
+    return firstWordA.compareTo(firstWordB);
+  });
+
+  setState(() {}); // Para ma-refresh ang UI
+}
+
+
+
 
   Future<void> deleteProduct(Productclass product) async {
     try {
@@ -100,9 +116,9 @@ void dispose() {
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Product deleted")),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("Product deleted")));
 
       loadProducts();
     } catch (e) {
@@ -119,10 +135,8 @@ void dispose() {
 
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-
           : Column(
               children: [
-
                 /// ⭐ Search Box
                 Padding(
                   padding: const EdgeInsets.all(12),
@@ -142,9 +156,7 @@ void dispose() {
                 /// ⭐ Product List
                 Expanded(
                   child: _filteredProducts.isEmpty
-                      ? const Center(
-                          child: Text("No products found"),
-                        )
+                      ? const Center(child: Text("No products found"))
                       : RefreshIndicator(
                           onRefresh: loadProducts,
                           child: ListView.builder(
@@ -156,17 +168,16 @@ void dispose() {
                               return Dismissible(
                                 key: Key(product.productClientUuid),
 
-                                direction:
-                                    DismissDirection.endToStart,
+                                direction: DismissDirection.endToStart,
 
                                 confirmDismiss: (_) async {
                                   return await showDialog(
                                     context: context,
                                     builder: (_) => AlertDialog(
-                                      title:
-                                          const Text("Delete Product"),
+                                      title: const Text("Delete Product"),
                                       content: const Text(
-                                          "Delete this product permanently?"),
+                                        "Delete this product permanently?",
+                                      ),
                                       actions: [
                                         TextButton(
                                           onPressed: () =>
@@ -178,8 +189,7 @@ void dispose() {
                                               Navigator.pop(context, true),
                                           child: const Text(
                                             "Delete",
-                                            style:
-                                                TextStyle(color: Colors.red),
+                                            style: TextStyle(color: Colors.red),
                                           ),
                                         ),
                                       ],
@@ -193,8 +203,7 @@ void dispose() {
 
                                 background: Container(
                                   alignment: Alignment.centerRight,
-                                  padding:
-                                      const EdgeInsets.only(right: 20),
+                                  padding: const EdgeInsets.only(right: 20),
                                   color: Colors.red,
                                   child: const Icon(
                                     Icons.delete,
@@ -204,10 +213,12 @@ void dispose() {
 
                                 child: Card(
                                   margin: const EdgeInsets.symmetric(
-                                      horizontal: 12, vertical: 6),
+                                    horizontal: 12,
+                                    vertical: 6,
+                                  ),
 
                                   child: ListTile(
-                                    title: Text(product.name),
+                                  title: Text(product.name.toUpperCase()),
 
                                     subtitle: Text(
                                       "Cost: ₱${product.costPrice.toStringAsFixed(2)}\n"
@@ -217,27 +228,26 @@ void dispose() {
                                     trailing: Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
-
                                         Column(
                                           mainAxisAlignment:
                                               MainAxisAlignment.center,
                                           crossAxisAlignment:
                                               CrossAxisAlignment.end,
                                           children: [
-
                                             Text(
                                               "Stock: ${product.stock}",
                                               style: const TextStyle(
-                                                  fontWeight:
-                                                      FontWeight.bold),
+                                                fontWeight: FontWeight.bold,
+                                              ),
                                             ),
 
                                             if (product.isPromo)
                                               const Text(
                                                 "PROMO",
                                                 style: TextStyle(
-                                                    color: Colors.red,
-                                                    fontSize: 12),
+                                                  color: Colors.red,
+                                                  fontSize: 12,
+                                                ),
                                               ),
                                           ],
                                         ),
@@ -255,16 +265,16 @@ void dispose() {
                                             Navigator.push(
                                               context,
                                               MaterialPageRoute(
-                                                builder: (_) =>
-                                                    AddProductPage(
+                                                builder: (_) => AddProductPage(
                                                   product: product,
                                                 ),
                                               ),
                                             ).then((result) {
-  if (result != null && result is Productclass) {
-    updateLocalProduct(result);
-  }
-});
+                                              if (result != null &&
+                                                  result is Productclass) {
+                                                updateLocalProduct(result);
+                                              }
+                                            });
                                           },
                                         ),
                                       ],
@@ -278,16 +288,15 @@ void dispose() {
                 ),
               ],
             ),
-bottomNavigationBar:  const BottomNavBar(),
-floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+      bottomNavigationBar: const BottomNavBar(),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+
       /// ⭐ Add Product Button
       floatingActionButton: FloatingActionButton(
         onPressed: () {
           Navigator.push(
             context,
-            MaterialPageRoute(
-              builder: (_) => const AddProductPage(),
-            ),
+            MaterialPageRoute(builder: (_) => const AddProductPage()),
           ).then((_) => loadProducts());
         },
         child: const Icon(Icons.add),
