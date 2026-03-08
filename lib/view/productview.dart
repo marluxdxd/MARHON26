@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cashier/widget/addproduct.dart';
 import 'package:cashier/class/productclass.dart';
 import 'package:cashier/services/product_service.dart';
-
+import 'package:cashier/widget/bottom_nav_bar.dart';
 class Productview extends StatefulWidget {
   const Productview({super.key});
 
@@ -12,13 +12,31 @@ class Productview extends StatefulWidget {
 
 class _ProductviewState extends State<Productview> {
   final ProductService _productService = ProductService();
-
+final ScrollController _scrollController = ScrollController();
   List<Productclass> _products = [];
   List<Productclass> _filteredProducts = [];
-
   bool _isLoading = true;
-
   final searchController = TextEditingController();
+
+
+  void updateLocalProduct(Productclass updatedProduct) {
+  final index = _products.indexWhere(
+      (p) => p.id == updatedProduct.id);
+
+  if (index != -1) {
+    setState(() {
+      _products[index] = updatedProduct;
+      _filteredProducts = List.from(_products);
+    });
+  }
+}
+  
+@override
+void dispose() {
+  _scrollController.dispose();
+  searchController.dispose();
+  super.dispose();
+}
 
   @override
   void initState() {
@@ -130,6 +148,7 @@ class _ProductviewState extends State<Productview> {
                       : RefreshIndicator(
                           onRefresh: loadProducts,
                           child: ListView.builder(
+                            controller: _scrollController,
                             itemCount: _filteredProducts.length,
                             itemBuilder: (context, index) {
                               final product = _filteredProducts[index];
@@ -241,7 +260,11 @@ class _ProductviewState extends State<Productview> {
                                                   product: product,
                                                 ),
                                               ),
-                                            ).then((_) => loadProducts());
+                                            ).then((result) {
+  if (result != null && result is Productclass) {
+    updateLocalProduct(result);
+  }
+});
                                           },
                                         ),
                                       ],
@@ -255,7 +278,8 @@ class _ProductviewState extends State<Productview> {
                 ),
               ],
             ),
-
+bottomNavigationBar:  const BottomNavBar(),
+floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       /// ⭐ Add Product Button
       floatingActionButton: FloatingActionButton(
         onPressed: () {

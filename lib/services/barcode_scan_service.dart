@@ -9,7 +9,28 @@ import '../services/product_service.dart';
 class BarcodeScanService {
   /// ⭐ SUPER FAST LOOKUP CACHE
   static Map<String, Productclass> _barcodeMap = {};
+static Future<void> refreshProductData({
+  required ProductService productService,
+  required List<POSRow> rows,
+}) async {
 
+  final newProducts = await productService.getAllProducts();
+
+  /// Rebuild cache
+  buildBarcodeCache(newProducts);
+
+  /// Update POS row product references
+  for (var row in rows) {
+    if (row.product == null) continue;
+
+    final updatedProduct = newProducts.firstWhere(
+      (p) => p.id == row.product!.id,
+      orElse: () => row.product!,
+    );
+
+    row.product = updatedProduct;
+  }
+}
   /// ===============================
   /// BUILD CACHE
   /// ===============================
@@ -106,17 +127,25 @@ class BarcodeScanService {
 
                       /// ⭐ ADD NEW PRODUCT
                       ElevatedButton(
-                        onPressed: () {
+                        onPressed: () async {
                           Navigator.pop(context); // close dialog
                           Navigator.pop(context); // close scanner
 
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) =>
-                                  AddProductPage(barcode: cleanBarcode),
-                            ),
-                          );
+                          await Navigator.push(
+  context,
+  MaterialPageRoute(
+    builder: (_) =>
+        AddProductPage(barcode: cleanBarcode),
+  ),
+);
+
+/// ⭐ REFRESH AFTER ADD PRODUCT
+await BarcodeScanService.refreshProductData(
+  productService: productService,
+  rows: rows,
+);
+
+refreshUI();
                         },
                         child: const Text("Add New Product"),
                       ),
@@ -142,23 +171,24 @@ class BarcodeScanService {
                             );
 
                             // ⭐ Reload products
-                            final newProducts = await productService.getAllProducts();
+                            final newProducts = await productService
+                                .getAllProducts();
 
-BarcodeScanService.buildBarcodeCache(newProducts);
+                            BarcodeScanService.buildBarcodeCache(newProducts);
 
-// Force refresh POS rows product references
-for (var row in rows) {
-  if (row.product != null) {
-    final updatedProduct = newProducts.firstWhere(
-      (p) => p.id == row.product!.id,
-      orElse: () => row.product!,
-    );
+                            // Force refresh POS rows product references
+                            for (var row in rows) {
+                              if (row.product != null) {
+                                final updatedProduct = newProducts.firstWhere(
+                                  (p) => p.id == row.product!.id,
+                                  orElse: () => row.product!,
+                                );
 
-    row.product = updatedProduct;
-  }
-}
+                                row.product = updatedProduct;
+                              }
+                            }
 
-refreshUI();
+                            refreshUI();
 
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(

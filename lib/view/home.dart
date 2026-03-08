@@ -11,6 +11,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:internet_connection_checker/internet_connection_checker.dart';
 import 'dart:async';
+import 'package:cashier/widget/bottom_nav_bar.dart';
 
 // ------------------ Helper Functions ------------------
 String generateUniqueId({String prefix = "S"}) {
@@ -132,24 +133,6 @@ setState(() {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            // Auto Next Row
-            // GestureDetector(
-            //   onTap: _toggleAutoNextRow,
-            //   child: Container(
-            //     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            //     decoration: BoxDecoration(
-            //       color: isAutoNextRowOn ? Colors.red : Colors.black,
-            //       borderRadius: BorderRadius.circular(6),
-            //     ),
-            //     child: Text(
-            //       isAutoNextRowOn ? "Auto Next Row: ON" : "Auto Next Row: OFF",
-            //       style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
-            //     ),
-            //   ),
-            // ),
-            // const SizedBox(height: 10),
-
-            // POS Rows
             Expanded(
               child: ListView.builder(
                 itemCount: posManager.rows.length,
@@ -352,7 +335,7 @@ setState(() {
       ),
       drawer: Appdrawer(),
 
-      /// ------------------- GCASH STYLE BARCODE CENTER BUTTON -------------------
+      // ------------------- GCASH STYLE BARCODE CENTER BUTTON -------------------
       floatingActionButton: FloatingActionButton(
         backgroundColor: Colors.white,
         onPressed: () {
@@ -370,140 +353,7 @@ setState(() {
 
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
 
-      bottomNavigationBar: BottomAppBar(
-        shape: const CircularNotchedRectangle(),
-        notchMargin: 6,
-        elevation: 8,
-        child: SafeArea(
-          child: SizedBox(
-            height: 70,
-            child: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                /// ======================
-                /// NAVBAR ICON ROW
-                /// ======================
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    _bottomIcon(Icons.home, () {}),
-
-                    _bottomIcon(Icons.receipt_long, () {}),
-
-                    /// Spacer for FAB notch
-                    const SizedBox(width: 40),
-
-                    _bottomIcon(Icons.history, () {}),
-
-                    /// Empty space (balance layout)
-                    const SizedBox(width: 40),
-                  ],
-                ),
-
-                /// ======================
-                /// AUTO NEXT ROW FLOATING BUTTON
-                /// ======================
-                if (showAutoToggle)
-                  Positioned(
-                    right: 10, // ⭐ Controls horizontal position from right edge
-                    bottom: 10, // ⭐ Controls vertical lift from bottom navbar
-
-                    child: GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          isAutoNextRowOn = !isAutoNextRowOn;
-                          isAutoAnimating = true;
-                        });
-
-                        Future.delayed(const Duration(milliseconds: 300), () {
-                          if (mounted) {
-                            setState(() => isAutoAnimating = false);
-                          }
-                        });
-                      },
-
-                      child: AnimatedScale(
-                        duration: const Duration(milliseconds: 200),
-                        scale: isAutoAnimating ? 1.2 : 1.0,
-
-                        child: Stack(
-                          alignment: Alignment.center,
-                          children: [
-                            /// Glow Ring
-                            AnimatedContainer(
-                              duration: const Duration(milliseconds: 300),
-                              width: 65,
-                              height: 65,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                gradient: isAutoNextRowOn
-                                    ? RadialGradient(
-                                        colors: [
-                                          Colors.red.withOpacity(0.5),
-                                          Colors.red.withOpacity(0),
-                                        ],
-                                      )
-                                    : RadialGradient(
-                                        colors: [
-                                          Colors.grey.withOpacity(0.3),
-                                          Colors.grey.withOpacity(0),
-                                        ],
-                                      ),
-                              ),
-                            ),
-
-                            /// Button Body
-                            Container(
-                              width: 52,
-                              height: 52,
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                shape: BoxShape.circle,
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.2),
-                                    blurRadius: 6,
-                                    offset: const Offset(0, 3),
-                                  ),
-                                ],
-                              ),
-
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Text(
-                                    isAutoNextRowOn ? "ON" : "OFF",
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.bold,
-                                      color: isAutoNextRowOn
-                                          ? Colors.red
-                                          : Colors.grey,
-                                    ),
-                                  ),
-
-                                  const SizedBox(height: 2),
-
-                                  Icon(
-                                    Icons.autorenew_outlined,
-                                    size: 20,
-                                    color: isAutoNextRowOn
-                                        ? Colors.red
-                                        : Colors.grey,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ),
-      ),
+      bottomNavigationBar:  const BottomNavBar(),
 
       body: OrientationBuilder(
         builder: (context, orientation) {

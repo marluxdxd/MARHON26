@@ -144,9 +144,13 @@ class _AddProductPageState extends State<AddProductPage> {
       }
 
       /// ⭐ Sync if online
-      if (online) {
+    if (online) {
   productService.notifyProductChanged();
+
+  /// Force full sync + reload cache
   await productService.syncOnlineProducts();
+  final products = await productService.getAllProducts();
+  BarcodeScanService.buildBarcodeCache(products);
 }
 
 /// ⭐ REFRESH BARCODE CACHE

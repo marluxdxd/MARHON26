@@ -1,17 +1,23 @@
-// import 'package:cashier/class/productclass.dart';
+import 'package:cashier/class/productclass.dart';
 
-// class ProductCacheService {
+class ProductCache {
+  static final ProductCache _instance = ProductCache._internal();
 
-//   static final Map<String, Productclass> _cache = {};
+  factory ProductCache() => _instance;
 
-//   static void preloadProducts(List<Productclass> products) {
-//     for (var p in products) {
-//       _cache[p.barcode] = p;
-//     }
-//   }
+  ProductCache._internal();
 
-//   static Productclass? getProduct(String barcode) {
-//     return _cache[barcode];
-//   }
+  final Map<int, Productclass> _products = {};
 
-// }
+  void load(List<Productclass> list) {
+    _products.clear();
+
+    for (var p in list) {
+      _products[p.id] = p;
+    }
+  }
+
+  Productclass? get(int id) {
+    return _products[id];
+  }
+}

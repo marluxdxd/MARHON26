@@ -282,7 +282,8 @@ print("PROMO COUNT: ${row.promo_count}");
     if (row.product != null) {
       displayPrice = row.isPromo
           ? row.product!.retailPrice * row.promo_count
-          : row.product!.retailPrice * row.qty;
+          : (row.product?.retailPrice ?? 0) *
+    (row.isPromo ? row.promo_count : row.qty);
     }
 
     final size = MediaQuery.of(context).size;

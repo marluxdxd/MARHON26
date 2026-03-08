@@ -1,3 +1,4 @@
+import 'package:cashier/class/productclass.dart';
 import 'package:cashier/database/local_db.dart';
 import 'package:cashier/services/product_service.dart';
 import 'package:cashier/services/transaction_service.dart';
@@ -166,7 +167,7 @@ class _AddProductPageEditState extends State<AddProductPageEdit> {
         const SnackBar(content: Text("Product updated successfully!")),
       );
 
-      Navigator.pop(context);
+      Navigator.pop(context, Productclass.fromMap(widget.product));
     } catch (e) {
       setState(() => isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
