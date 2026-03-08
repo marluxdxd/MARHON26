@@ -288,7 +288,7 @@ void sortProductsAlphabetically() {
                 ),
               ],
             ),
-      bottomNavigationBar: const BottomNavBar(),
+      // bottomNavigationBar: const BottomNavBar(),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
 
       /// ⭐ Add Product Button

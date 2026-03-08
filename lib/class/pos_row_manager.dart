@@ -437,9 +437,12 @@ print("PROMO COUNT: ${row.promo_count}");
         const SizedBox(width: 8),
 
         Text(
-          "₱${displayPrice.toStringAsFixed(2)}",
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ),
+    "₱${displayPrice.toStringAsFixed(2)}",
+    style: const TextStyle(
+      fontWeight: FontWeight.bold,
+      color: Colors.red,
+    ),
+  ),
 
         if (relaxLayout)
           IconButton(

@@ -7,6 +7,7 @@ import 'package:cashier/services/scan_mode.dart';
 import 'package:cashier/widget/appdrawer.dart';
 import 'package:cashier/class/pos_row_manager.dart';
 import 'package:cashier/class/productclass.dart';
+import 'package:cashier/widget/barcode_fab.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:internet_connection_checker/internet_connection_checker.dart';
@@ -336,44 +337,18 @@ setState(() {
       drawer: Appdrawer(),
 
      // ------------------- GCASH STYLE BARCODE CENTER BUTTON -------------------
-    floatingActionButton: Transform.translate(
-        offset: const Offset(0, 22), // move slightly down if needed
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            FloatingActionButton(
-              backgroundColor: Colors.white,
-              onPressed: () {
-                BarcodeScanService.scanBarcode(
-                  context: context,
-                  products: products,
-                  rows: posManager.rows,
-                  isAutoNextRowOn: isAutoNextRowOn,
-                  refreshUI: _updateUI,
-                  mode: ScanMode.posSale,
-                );
-              },
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16), // rounded corners
-                side: const BorderSide(
-                  color: Colors.blue, // border color
-                  width: 2,          // border thickness
-                ),
-              ),
-              child: const Icon(Icons.qr_code_scanner_sharp, size: 30, color: Colors.black),
-            ),
-            const SizedBox(height: 4), // spacing between icon and text
-            const Text(
-              "Barcode",
-              style: TextStyle(
-                fontSize: 9,
-              
-                color: Colors.black,
-              ),
-            ),
-          ],
-        ),
-      ),
+  floatingActionButton: BarcodeFAB(
+    onPressed: () {
+      BarcodeScanService.scanBarcode(
+        context: context,
+        products: products,
+        rows: posManager.rows,
+        isAutoNextRowOn: isAutoNextRowOn,
+        refreshUI: _updateUI,
+        mode: ScanMode.posSale,
+      );
+    },
+  ),
 
 
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,

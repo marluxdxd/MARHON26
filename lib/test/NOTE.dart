@@ -45,7 +45,111 @@
               //       ),
               //     ),
               //   ),
+import 'package:flutter/material.dart';
 
+class BottomNavBar extends StatelessWidget {
+
+  final int selectedIndex;
+  final Function(int) onItemTapped;
+
+  const BottomNavBar({
+    super.key,
+    required this.selectedIndex,
+    required this.onItemTapped,
+  });
+
+  Widget _buildItem(
+      IconData icon,
+      String label,
+      int index,
+      int selectedIndex,
+      Function(int) onTap,
+      ) {
+    final bool isActive = selectedIndex == index;
+
+    return Expanded(
+      child: InkWell(
+        onTap: () => onTap(index),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+
+            Icon(
+              icon,
+              size: 22,
+              color: isActive ? Colors.blue : Colors.black,
+            ),
+
+            const SizedBox(height: 3),
+
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                color: isActive ? Colors.blue : Colors.black,
+              ),
+            )
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+
+    return BottomAppBar(
+      shape: const CircularNotchedRectangle(),
+      notchMargin: 8,
+      elevation: 8,
+
+      child: SizedBox(
+        height: 60,
+
+        child: Row(
+          children: [
+
+            _buildItem(
+              Icons.home_outlined,
+              "Home",
+              0,
+              selectedIndex,
+              onItemTapped,
+            ),
+
+            _buildItem(
+              Icons.shopping_bag_outlined,
+              "Product",
+              1,
+              selectedIndex,
+              onItemTapped,
+            ),
+
+            const Expanded(child: SizedBox()),
+
+            _buildItem(
+              Icons.inventory_2_outlined,
+              "Inventory",
+              2,
+              selectedIndex,
+              onItemTapped,
+            ),
+
+            _buildItem(
+              Icons.person_outline,
+              "Profile",
+              3,
+              selectedIndex,
+              onItemTapped,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 
               //ARI SA NAKO GI BUTANG TONG AUTO ON-OFF (POS NEXT ROW)
+
+              //to be continued sa main_navigation.dart kay daghan na siya code and para dili maglibog
