@@ -288,8 +288,7 @@ void sortProductsAlphabetically() {
                 ),
               ],
             ),
-      // bottomNavigationBar: const BottomNavBar(),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+      
 
       /// ⭐ Add Product Button
       floatingActionButton: FloatingActionButton(

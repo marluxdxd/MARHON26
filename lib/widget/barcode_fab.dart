@@ -18,7 +18,7 @@ class BarcodeFAB extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           FloatingActionButton(
-            heroTag: heroTag ?? "barcodeFAB", // default unique tag
+            heroTag: 'null', // default unique tag
             backgroundColor: Colors.white,
             onPressed: onPressed,
             shape: RoundedRectangleBorder(

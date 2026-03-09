@@ -1,21 +1,18 @@
-import 'package:cashier/view/home.dart';
-import 'package:cashier/view/productview.dart';
 import 'package:flutter/material.dart';
 
-class BottomNavBar extends StatefulWidget {
-  const BottomNavBar({super.key});
+class BottomNavBar extends StatelessWidget {
+  final int currentIndex;
+  final ValueChanged<int> onTabSelected;
 
-  @override
-  State<BottomNavBar> createState() => _BottomNavBarState();
-}
+  const BottomNavBar({
+    super.key,
+    required this.currentIndex,
+    required this.onTabSelected,
+  });
 
-class _BottomNavBarState extends State<BottomNavBar> {
-
-  // ---------------- Icon + Label ----------------
-  Widget _bottomIconWithLabel(
-      IconData icon, String label, VoidCallback onTap) {
+  Widget _bottomIconWithLabel(IconData icon, String label, int index) {
     return GestureDetector(
-      onTap: onTap,
+      onTap: () => onTabSelected(index),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         mainAxisAlignment: MainAxisAlignment.center,
@@ -23,14 +20,14 @@ class _BottomNavBarState extends State<BottomNavBar> {
           Icon(
             icon,
             size: 22,
-            color: Colors.black,
+            color: currentIndex == index ? Colors.blue : Colors.black54,
           ),
           const SizedBox(height: 3),
           Text(
             label,
-            style: const TextStyle(
-              fontSize: 11,
-              color: Colors.black,
+            style: TextStyle(
+              fontSize: 8.5,
+              color: currentIndex == index ? Colors.blue : Colors.black54,
             ),
           ),
         ],
@@ -41,6 +38,7 @@ class _BottomNavBarState extends State<BottomNavBar> {
   @override
   Widget build(BuildContext context) {
     return BottomAppBar(
+      color: Color(Colors.white.value + 0xFF000000), // Ensure it's fully opaque white
       shape: const CircularNotchedRectangle(),
       notchMargin: 8,
       elevation: 8,
@@ -49,73 +47,11 @@ class _BottomNavBarState extends State<BottomNavBar> {
           height: 55,
           child: Row(
             children: [
-
-              // HOME
-              Expanded(
-                child: _bottomIconWithLabel(
-                  Icons.home_outlined,
-                  "Home",
-                  () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const Home(),
-                      ),
-                    );
-                  },
-                ),
-              ),
-
-              // PRODUCT
-              Expanded(
-                child: _bottomIconWithLabel(
-                  Icons.pending_actions_rounded,
-                  "Product",
-                  () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const Productview(),
-                      ),
-                    );
-                  },
-                ),
-              ),
-
-              // SPACE FOR QR / FAB
-              const Expanded(child: SizedBox()),
-
-              // INVENTORY
-              Expanded(
-                child: _bottomIconWithLabel(
-                  Icons.inventory_2_outlined,
-                  "Inventory",
-                  () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const Productview(),
-                      ),
-                    );
-                  },
-                ),
-              ),
-
-              // PROFILE
-              Expanded(
-                child: _bottomIconWithLabel(
-                  Icons.person_outline,
-                  "Profile",
-                  () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const Productview(),
-                      ),
-                    );
-                  },
-                ),
-              ),
+              Expanded(child: _bottomIconWithLabel(Icons.home_outlined, "Home", 0)),
+              Expanded(child: _bottomIconWithLabel(Icons.pending_actions_rounded, "Products", 1)),
+              const Expanded(child: SizedBox()), // Space for FAB
+              Expanded(child: _bottomIconWithLabel(Icons.bar_chart, "Transactions", 2)),
+              Expanded(child: _bottomIconWithLabel(Icons.person_2_outlined, "Profile", 3)),
             ],
           ),
         ),

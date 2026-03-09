@@ -21,7 +21,7 @@ class BarcodeScannerPage extends StatefulWidget {
 
 class _BarcodeScannerPageState extends State<BarcodeScannerPage> {
   Productclass? scannedProduct;
-  String? lastScannedCode;
+  Set<String> scannedCodes = {}; // ✅ Keep all scanned barcodes to avoid duplicates
   List<Productclass> scannedList = [];
 
   final MobileScannerController controller =
@@ -72,19 +72,33 @@ class _BarcodeScannerPageState extends State<BarcodeScannerPage> {
 
   Future<void> _onDetect(BarcodeCapture capture) async {
     if (isProcessing) return;
+
     final barcodes = capture.barcodes;
     if (barcodes.isEmpty) return;
+
     final code = barcodes.first.rawValue;
     if (code == null) return;
+
     final barcode = code.trim();
-    if (barcode.isEmpty || barcode == lastScannedCode) return;
+    if (barcode.isEmpty) return;
+
+    // ✅ Skip if barcode already scanned
+    if (scannedCodes.contains(barcode)) return;
 
     isProcessing = true;
-    lastScannedCode = barcode;
+    scannedCodes.add(barcode); // Add to set to prevent duplicates
 
     final product = await _findProduct(barcode);
 
-    if (product != null) debugPrint("PRODUCT FOUND: ${product.name}");
+    // 🔹 DEBUG: Print scanned barcode and product info
+    if (product != null) {
+      debugPrint("✅ PRODUCT SCANNED BARCODE: $barcode");
+      debugPrint("➡️ PRODUCT ID: ${product.id}");
+      debugPrint("➡️ PRODUCT NAME: ${product.name}");
+      debugPrint("➡️ PRODUCT PRICE: ₱${product.retailPrice}");
+    } else {
+      debugPrint("❌ PRODUCT NOT FOUND FOR BARCODE: $barcode");
+    }
 
     setState(() {
       scannedProduct = product;
@@ -99,7 +113,7 @@ class _BarcodeScannerPageState extends State<BarcodeScannerPage> {
 
     if (await Vibration.hasVibrator() ?? false) Vibration.vibrate(duration: 70);
 
-    await Future.delayed(const Duration(milliseconds: 300));
+    await Future.delayed(const Duration(milliseconds: 300)); // short debounce
     isProcessing = false;
   }
 
@@ -119,25 +133,21 @@ class _BarcodeScannerPageState extends State<BarcodeScannerPage> {
       ),
       body: Stack(
         children: [
-          // CAMERA
           MobileScanner(controller: controller, onDetect: _onDetect),
 
-          //  OVERLAY INSIDE SCAN BOX
+          // Overlay painter
           Positioned.fill(
-            child: Container(
-              color: Colors.transparent,
-              child: CustomPaint(
-                painter: _ScanOverlayPainter(
-                  boxWidth: boxWidth,
-                  boxHeight: boxHeight,
-                  screenWidth: screenWidth,
-                  screenHeight: screenHeight,
-                ),
+            child: CustomPaint(
+              painter: _ScanOverlayPainter(
+                boxWidth: boxWidth,
+                boxHeight: boxHeight,
+                screenWidth: screenWidth,
+                screenHeight: screenHeight,
               ),
             ),
           ),
 
-          // SCAN BOX BORDER (transparent inside)
+          // Scan box border
           Positioned(
             top: screenHeight * 0.15,
             left: (screenWidth - boxWidth) / 2,
@@ -151,7 +161,7 @@ class _BarcodeScannerPageState extends State<BarcodeScannerPage> {
             ),
           ),
 
-          // LASER SCAN LINE
+          // Laser scan line
           Positioned(
             top: screenHeight * 0.15 + scanLinePosition,
             left: (screenWidth - boxWidth) / 2,
@@ -173,25 +183,25 @@ class _BarcodeScannerPageState extends State<BarcodeScannerPage> {
             ),
           ),
 
-          // FLASHLIGHT TOGGLE
+          // Torch toggle
           Positioned(
-            top: screenHeight * 0.08,
-            right: 20,
-            child: FloatingActionButton(
-              mini: true,
-              backgroundColor: Colors.white70,
-              onPressed: () async {
-                await controller.toggleTorch();
-                setState(() => isTorchOn = !isTorchOn);
-              },
-              child: Icon(
-                isTorchOn ? Icons.flash_on : Icons.flash_off,
-                color: isTorchOn ? Colors.yellow : Colors.black,
-              ),
-            ),
-          ),
+  top: screenHeight * 0.08,
+  left: (screenWidth - 56) / 2, // 56 kay default size sa FloatingActionButton
+  child: FloatingActionButton(
+    mini: true,
+    backgroundColor: Colors.white70,
+    onPressed: () async {
+      await controller.toggleTorch();
+      setState(() => isTorchOn = !isTorchOn);
+    },
+    child: Icon(
+      isTorchOn ? Icons.flashlight_on : Icons.flashlight_off,
+      color: isTorchOn ? Colors.white : Colors.black,
+    ),
+  ),
+),
 
-          // PRODUCT PREVIEW CARD
+          // Product preview
           if (scannedProduct != null)
             Positioned(
               top: screenHeight * 0.15 + boxHeight + 20,
@@ -217,7 +227,7 @@ class _BarcodeScannerPageState extends State<BarcodeScannerPage> {
                                   color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
                             ),
                             Text("Barcode: ${scannedProduct!.barcode}",
-                                style: const TextStyle(color: Colors.white70)),
+                                style: const TextStyle(color: Color.fromARGB(179, 20, 11, 11))),
                             Text("Price: ₱${scannedProduct!.retailPrice.toStringAsFixed(2)}",
                                 style: const TextStyle(
                                     color: Colors.greenAccent, fontWeight: FontWeight.bold)),
@@ -230,7 +240,7 @@ class _BarcodeScannerPageState extends State<BarcodeScannerPage> {
               ),
             ),
 
-          // SCANNED LIST
+          // Scanned list
           Positioned(
             bottom: 0,
             left: 0,
@@ -268,7 +278,6 @@ class _BarcodeScannerPageState extends State<BarcodeScannerPage> {
   }
 }
 
-/// Custom painter to darken the area outside the scan box
 class _ScanOverlayPainter extends CustomPainter {
   final double boxWidth;
   final double boxHeight;

@@ -5,6 +5,7 @@ import 'package:cashier/view/productview.dart';
 import 'package:cashier/view/reports_file/sales_reports_screen.dart';
 import 'package:cashier/view/stock_screnn.dart';
 import 'package:cashier/view/transaction_history.dart';
+import 'package:cashier/widget/addproduct.dart';
 import 'package:flutter/material.dart';
 
 class Appdrawer extends StatefulWidget {
@@ -44,7 +45,7 @@ class _AppdrawerState extends State<Appdrawer> {
                                 // 🔥 Navigate back to USER MODE
                                 Navigator.pushReplacement(
                                   context,
-                                  MaterialPageRoute(builder: (_) => Home()),
+                                  MaterialPageRoute(builder: (_) => AddProductPage()),
                                 );
                               },
                               child: Text('User'),
@@ -56,7 +57,7 @@ class _AppdrawerState extends State<Appdrawer> {
                                 // 🔥 Navigate back to USER MODE
                                 Navigator.pushReplacement(
                                   context,
-                                  MaterialPageRoute(builder: (_) => Home()),
+                                  MaterialPageRoute(builder: (_) => AddProductPage()),
                                 );
                               },
                               child: Text('User'),
@@ -94,23 +95,7 @@ class _AppdrawerState extends State<Appdrawer> {
                     );
                   },
                 ),
-          ListTile(
-            leading: Icon(Icons.home),
-            title: Text("Home"),
-            onTap: () {
-              Navigator.pop(context);
-            },
-          ),
-          ListTile(
-            leading: Icon(Icons.inventory_rounded),
-            title: Text("Add/edit/delete"),
-            onTap: () {
-              Navigator.push(
-                context,
-               MaterialPageRoute(builder: (_) => const Productview()),
-              );
-            },
-          ),
+        
 
           ListTile(
             leading: Icon(Icons.storefront_sharp),
