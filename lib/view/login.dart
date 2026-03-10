@@ -21,12 +21,12 @@ class LoginScreen extends StatelessWidget {
       Icon(
         Icons.storefront_sharp,
         size: 30,
-        color: Colors.black,
+        color: Colors.blue,
       ),
        Text(
-        'Barato',
+        'Palit Na Barato Ra',
         style: TextStyle(
-          color: Colors.black,
+          color: Colors.blue,
           fontWeight: FontWeight.bold,
           fontSize: 13,
         ),

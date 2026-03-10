@@ -1,19 +1,16 @@
+import 'package:cashier/view/lowstock.dart';
+import 'package:flutter/material.dart';
 import 'package:cashier/class/posrowclass.dart';
-import 'package:cashier/database/local_db.dart';
-import 'package:cashier/database/local_db_transactionpromo.dart';
-import 'package:cashier/services/product_service.dart';
-import 'package:cashier/services/transaction_promo_service.dart';
-import 'package:cashier/services/transaction_service.dart';
-import 'package:cashier/utils.dart';
 import 'package:cashier/class/pos_row_manager.dart';
 import 'package:cashier/class/productclass.dart';
 import 'package:cashier/widget/qtybottomsheet.dart';
-import 'package:flutter/material.dart';
+import 'package:cashier/services/product_service.dart';
+import 'package:cashier/services/transaction_service.dart';
+import 'dart:async';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:internet_connection_checker/internet_connection_checker.dart';
-import 'dart:async';
 
-// ------------------ Helper ------------------
+
 String generateUniqueId({String prefix = "S"}) {
   return "$prefix${DateTime.now().millisecondsSinceEpoch}";
 }
@@ -40,15 +37,10 @@ class _HomeState extends State<Home> with SingleTickerProviderStateMixin {
   late POSRowManager posManager;
   late TabController _tabController;
 
-  bool isSyncingOnline = false;
-  bool isSyncing = false;
-  bool syncSuccess = false;
-
   StreamSubscription<InternetConnectionStatus>? _listener;
   StreamSubscription<ConnectivityResult>? _connectivityListener;
 
   TextEditingController customerCashController = TextEditingController();
-
   final TransactionService transactionService = TransactionService();
   final ProductService productService = ProductService();
 
@@ -58,9 +50,7 @@ class _HomeState extends State<Home> with SingleTickerProviderStateMixin {
     posManager = widget.posManager;
 
     _tabController = TabController(length: 2, vsync: this);
-    _tabController.addListener(() {
-      setState(() {}); // rebuild to update tab colors
-    });
+    _tabController.addListener(() => setState(() {}));
 
     _listener = InternetConnectionChecker().onStatusChange.listen((status) async {
       if (status == InternetConnectionStatus.connected) {
@@ -88,101 +78,108 @@ class _HomeState extends State<Home> with SingleTickerProviderStateMixin {
   // POS TAB
   // ============================
   Widget _buildPOSTab() {
+    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 8.0),
       child: Column(
         children: [
-          Expanded(
+          // POS Rows container nga flexible + scrollable
+          Flexible(
             child: ListView.builder(
+              padding: EdgeInsets.zero,
               itemCount: posManager.rows.length,
-              itemBuilder: (_, index) => posManager.buildRow(
-                posManager.rows[index],
-                index,
-                onUpdate: _updateUI,
-                isAutoNextRowOn: widget.isAutoNextRowOn,
-              ),
-            ),
-          ),
-          const SizedBox(height: 10),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(15),
-              border: Border.all(color: Colors.grey),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Total Bill:',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-                ),
-                Text(
-                  "₱${posManager.totalBill.toStringAsFixed(2)}",
-                  style: const TextStyle(
-                    color: Colors.red,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 18,
+              itemBuilder: (_, index) {
+                final row = posManager.rows[index];
+                return Container(
+                  color: Colors.blue, // blue background sa row + gap
+                  child: posManager.buildRow(
+                    row,
+                    index,
+                    onUpdate: _updateUI,
+                    isAutoNextRowOn: widget.isAutoNextRowOn,
                   ),
-                ),
-              ],
+                );
+              },
             ),
           ),
+
           const SizedBox(height: 10),
-          TextField(
-            controller: customerCashController,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(
-              labelText: "Customer Cash",
-              border: OutlineInputBorder(),
-            ),
+
+          // Total Bill + Customer Cash Section
+          isLandscape
+              ? Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(child: _totalBillWidget()),
+                    const SizedBox(width: 10),
+                    Expanded(child: _customerCashWidget()),
+                  ],
+                )
+              : Column(
+                  children: [
+                    _totalBillWidget(),
+                    const SizedBox(height: 10),
+                    _customerCashWidget(),
+                  ],
+                ),
+        ],
+      ),
+    );
+  }
+
+  Widget _totalBillWidget() {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: Colors.blue),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          const Text(
+            'Total Bill:',
+            style: TextStyle(
+                fontWeight: FontWeight.bold, fontSize: 18, color: Colors.blue),
+          ),
+          Text(
+            "₱${posManager.totalBill.toStringAsFixed(2)}",
+            style: const TextStyle(
+                color: Colors.blue,
+                fontWeight: FontWeight.bold,
+                fontSize: 18),
           ),
         ],
       ),
     );
   }
 
-  // ============================
-  // LOW STOCK TAB
-  // ============================
-  Widget _buildLowStockTab() {
-    final lowStockProducts = widget.products.where((p) => p.stock <= 3).toList();
-
-    return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-      itemCount: lowStockProducts.length,
-      itemBuilder: (context, index) {
-        final product = lowStockProducts[index];
-        return Card(
-          margin: const EdgeInsets.symmetric(vertical: 6),
-          child: ListTile(
-            title: Text(product.name),
-            subtitle: Text("Stock: ${product.stock}"),
-            trailing: Text("₱${product.retailPrice.toStringAsFixed(2)}"),
-            onTap: () async {
-              final qty = await showModalBottomSheet<int>(
-                context: context,
-                builder: (_) => Qtybottomsheet(stock: product.stock),
-              );
-
-              if (qty != null) {
-                final row = posManager.rows.firstWhere(
-                  (r) => r.product == null,
-                  orElse: () {
-                    posManager.addEmptyRow();
-                    return posManager.rows.last;
-                  },
-                );
-                row.product = product;
-                row.qty = qty;
-                row.otherQty = product.otherQty;
-                _updateUI();
-              }
-            },
-          ),
-        );
-      },
+  Widget _customerCashWidget() {
+    return TextField(
+      controller: customerCashController,
+      keyboardType: TextInputType.number,
+      style: const TextStyle(
+        color: Colors.blue,
+        fontWeight: FontWeight.bold,
+      ),
+      decoration: InputDecoration(
+        labelText: "Customer Cash",
+        labelStyle: const TextStyle(color: Colors.blue),
+        border: OutlineInputBorder(
+          borderSide: const BorderSide(color: Colors.blue),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderSide: const BorderSide(color: Colors.blue),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderSide: const BorderSide(color: Colors.blue, width: 2),
+          borderRadius: BorderRadius.circular(8),
+        ),
+      ),
     );
   }
 
@@ -192,19 +189,19 @@ class _HomeState extends State<Home> with SingleTickerProviderStateMixin {
   Widget _buildCustomTab(String text, int index) {
     bool selected = _tabController.index == index;
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+      padding: const EdgeInsets.symmetric(vertical: 4),
       decoration: BoxDecoration(
         color: selected ? Colors.blue : Colors.transparent,
         borderRadius: const BorderRadius.only(
-      topLeft: Radius.circular(5),
-      topRight: Radius.circular(5),
-    ),
+          topLeft: Radius.circular(5),
+          topRight: Radius.circular(5),
+        ),
       ),
       alignment: Alignment.center,
       child: Text(
         text,
         style: TextStyle(
-          color: selected ? Colors.white : Colors.black,
+          color: selected ? Colors.white : Colors.blue,
           fontWeight: FontWeight.bold,
         ),
       ),
@@ -226,39 +223,39 @@ class _HomeState extends State<Home> with SingleTickerProviderStateMixin {
         title: Row(
           mainAxisSize: MainAxisSize.min,
           children: const [
-            Icon(Icons.storefront_sharp, size: 40, color: Colors.black),
+            Icon(Icons.storefront_sharp, size: 40, color: Colors.blue),
             SizedBox(width: 4),
             Text(
-              'Barato',
+              'Palit na Barato Ra',
               style: TextStyle(
-                color: Colors.black,
-                fontWeight: FontWeight.bold,
-                fontSize: 13,
-              ),
+                  color: Colors.blue,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13),
             ),
           ],
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.mail_outline_outlined, size: 30, color: Colors.black),
+            icon: const Icon(Icons.mail_outline_outlined,
+                size: 30, color: Colors.black),
             onPressed: () {
-              Navigator.pushNamed(context, "/profile").then((_) => widget.refreshUI());
+              Navigator.pushNamed(context, "/profile")
+                  .then((_) => widget.refreshUI());
             },
           ),
         ],
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(48),
+          preferredSize: const Size.fromHeight(40),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 8.0),
             child: Row(
               children: [
                 Expanded(
                   child: GestureDetector(
                     onTap: () => _tabController.animateTo(0),
-                    child: _buildCustomTab("POS", 0),
+                    child: _buildCustomTab("Palit na!", 0),
                   ),
                 ),
-                const SizedBox(width: 8),
                 Expanded(
                   child: GestureDetector(
                     onTap: () => _tabController.animateTo(1),
@@ -272,9 +269,10 @@ class _HomeState extends State<Home> with SingleTickerProviderStateMixin {
       ),
       body: TabBarView(
         controller: _tabController,
+        physics: const NeverScrollableScrollPhysics(), // disable swipe
         children: [
           _buildPOSTab(),
-          _buildLowStockTab(),
+          LowStock(products: widget.products), // LowStock as tab
         ],
       ),
     );

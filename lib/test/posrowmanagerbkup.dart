@@ -230,7 +230,7 @@ Future<void> handleScannedBarcode(
       mainAxisSize: MainAxisSize.min,
       children: [
         IconButton(
-          icon: const Icon(Icons.remove_circle_outline,color: Colors.white,),
+          icon: const Icon(Icons.remove_circle_outline),
           onPressed: () {
             if (row.isPromo) {
               if (row.promo_count > 1) {
@@ -246,10 +246,10 @@ Future<void> handleScannedBarcode(
         ),
         Text(
           row.isPromo ? row.promo_count.toString() : row.qty.toString(),
-          style: const TextStyle(fontSize: 16, color: Colors.white),
+          style: const TextStyle(fontSize: 16),
         ),
         IconButton(
-          icon: const Icon(Icons.add_circle_outline, color: Colors.white),
+          icon: const Icon(Icons.add_circle_outline),
           onPressed: () {
             if (row.isPromo) {
               row.promo_count++;
@@ -338,7 +338,7 @@ print("PROMO COUNT: ${row.promo_count}");
                 final selectedProduct =
                     await showModalBottomSheet<Productclass>(
                       context: context,
-                      barrierColor: Colors.white,
+                      barrierColor: Colors.black.withOpacity(0.0),
                       isScrollControlled: true,
                       builder: (_) => Productbottomsheet(),
                     );
@@ -395,25 +395,19 @@ print("PROMO COUNT: ${row.promo_count}");
                   await autoFillRows(onUpdate);
                 }
               },
-              child: Padding(
-                padding: const EdgeInsets.only(left: 8.0),
-                child: Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.white),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    row.product?.name ?? "Select Product",
-                    overflow: isLandscape
-                        ? TextOverflow.visible
-                        : TextOverflow.ellipsis,
-                    maxLines: 1,
-                    softWrap: false,
-                    style: const TextStyle(
-                    color: Colors.white, fontWeight: FontWeight.bold,
-                  ),
-                  ),
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  row.product?.name ?? "Select Product",
+                  overflow: isLandscape
+                      ? TextOverflow.visible
+                      : TextOverflow.ellipsis,
+                  maxLines: 1,
+                  softWrap: false,
                 ),
               ),
             ),
@@ -426,15 +420,13 @@ print("PROMO COUNT: ${row.promo_count}");
         Container(
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
-            border: Border.all(color: Colors.white),
+            border: Border.all(color: Colors.grey),
             borderRadius: BorderRadius.circular(4),
-            color: Colors.blue,
+            color: Colors.grey[200],
           ),
           child: Text(
             row.isPromo ? row.otherQty.toString() : row.qty.toString(),
             textAlign: TextAlign.center,
-             style: const TextStyle(
-    color: Colors.white,),
           ),
         ),
 
@@ -444,16 +436,13 @@ print("PROMO COUNT: ${row.promo_count}");
 
         const SizedBox(width: 8),
 
-        Padding(
-          padding: const EdgeInsets.only(right: 8.0),
-          child: Text(
-              "₱${displayPrice.toStringAsFixed(2)}",
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
-            ),
-        ),
+        Text(
+    "₱${displayPrice.toStringAsFixed(2)}",
+    style: const TextStyle(
+      fontWeight: FontWeight.bold,
+      color: Colors.red,
+    ),
+  ),
 
         if (relaxLayout)
           IconButton(
@@ -510,7 +499,7 @@ print("PROMO COUNT: ${row.promo_count}");
         width: size.width,
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          border: Border.all(color: Colors.white),
+          border: Border.all(color: Colors.black),
           borderRadius: BorderRadius.circular(6),
         ),
         child: mainRow,
