@@ -476,7 +476,7 @@ print("PROMO COUNT: ${row.promo_count}");
     if (!relaxLayout) {
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 6),
-        child: Dismissible(
+        child: Dismissible( 
           key: ValueKey(row.hashCode),
           direction: DismissDirection.endToStart,
           background: Container(

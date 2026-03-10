@@ -1,4 +1,5 @@
 
+import 'package:cashier/utils/preferences.dart';
 import 'package:cashier/view/master.dart';
 import 'package:cashier/widget/main_navigation.dart';
 import 'package:flutter/material.dart';
@@ -50,8 +51,8 @@ class LoginScreen extends StatelessWidget {
 
                 /// GUEST BUTTON
                 GestureDetector(
-                  onTap: () {
-
+                  onTap: () async {
+await Preferences.saveLoginRole("guest");
                     Navigator.pushReplacement(
                       context,
                       MaterialPageRoute(
