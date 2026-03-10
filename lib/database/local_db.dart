@@ -146,7 +146,7 @@ class LocalDatabase {
         retail_price REAL DEFAULT 0,
         by_pieces INTEGER DEFAULT 0,
         stock INTEGER NOT NULL,
-        low_stock_threshold INTEGER DEFAULT 1,
+        low_stock_threshold INTEGER DEFAULT 0,
         is_promo INTEGER DEFAULT 0,
         other_qty INTEGER DEFAULT 0,
         is_synced INTEGER DEFAULT 0,
@@ -593,6 +593,7 @@ CREATE TABLE transaction_items(
     bool isPromo = false,
     int otherQty = 0,
     String? clientUuid,
+    int lowStock = 0,
     
   }) async {
     final db = await database;
@@ -609,6 +610,7 @@ CREATE TABLE transaction_items(
         'is_promo': isPromo ? 1 : 0,
         'other_qty': otherQty,
         'client_uuid': clientUuid, // <- save it
+        'low_stock_threshold': lowStock, // ✅ Add low stock threshold
       },
       conflictAlgorithm: ConflictAlgorithm.replace, // update if exists
     );
@@ -646,6 +648,7 @@ Future<void> updateProduct({
   required double retailPrice,
   required bool isPromo,
   required int otherQty,
+  int lowStock = 0,
 }) async {
   final dbClient = await database;
 
@@ -660,6 +663,7 @@ Future<void> updateProduct({
       'retail_price': retailPrice,
       'is_promo': isPromo ? 1 : 0,
       'other_qty': otherQty,
+      'low_stock_threshold': lowStock, // ✅ Add low stock threshold
     },
     where: 'id = ?',
     whereArgs: [id],
@@ -910,6 +914,7 @@ Future<int> insertTransactionItem({
     required double byPieces,
     required bool isPromo,
     required int otherQty, 
+    int lowStock = 0,
     
   }) async {
     final db = await database;
@@ -934,6 +939,7 @@ Future<int> insertTransactionItem({
         'other_qty': otherQty,
         'client_uuid': clientUuid,
         'is_synced': 1,
+        'low_stock_threshold': lowStock, // ✅ Add low stock threshold
       });
     } else {
       await db.update(
@@ -947,6 +953,7 @@ Future<int> insertTransactionItem({
           'by_pieces': byPieces, 
           'is_promo': isPromo ? 1 : 0,
           'other_qty': otherQty,
+          'low_stock_threshold': lowStock, // ✅ Add low stock threshold
         },
         where: 'client_uuid = ?',
         whereArgs: [clientUuid],

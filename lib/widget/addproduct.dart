@@ -79,9 +79,11 @@ class _AddProductPageState extends State<AddProductPage>
   /// SAVE PRODUCT
   /// ===============================
   void saveProduct() async {
+    
     final name = nameController.text.trim();
     final barcode = barcodeController.text.trim();
     final stock = int.tryParse(stockController.text) ?? 0;
+    final lowStock = int.tryParse(lowStockController.text) ?? 0;
     final costPrice = double.tryParse(costPriceController.text) ?? 0;
     final retailPrice = double.tryParse(retailPriceController.text) ?? 0;
     final byPieces = int.tryParse(byPiecesController.text) ?? 1;
@@ -109,6 +111,7 @@ class _AddProductPageState extends State<AddProductPage>
           byPieces: byPieces,
           isPromo: isPromo,
           otherQty: otherQty,
+          lowStock: lowStock,
         );
       } else {
         // UPDATE MODE
@@ -121,6 +124,7 @@ class _AddProductPageState extends State<AddProductPage>
             "name": name,
             "barcode": barcode,
             "cost_price": costPrice,
+            "low_stock_threshold": lowStock,
             "retail_price": retailPrice,
             "by_pieces": byPieces,
             "is_promo": isPromo ? 1 : 0,
@@ -138,6 +142,7 @@ class _AddProductPageState extends State<AddProductPage>
             name: name,
             barcode: barcode,
             stock: stock,
+              lowStock: lowStock,
             costPrice: costPrice,
             retailPrice: retailPrice,
             byPieces: byPieces,

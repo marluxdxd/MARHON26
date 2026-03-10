@@ -12,6 +12,7 @@ class Productclass {
   final int otherQty;
   final String type; // 'add', 'update', 'delete' for sync
   final String productClientUuid;
+  int lowStock;
 
   Productclass({
     required this.id,
@@ -25,6 +26,7 @@ class Productclass {
     this.isPromo = false, // default false
     this.otherQty = 0, // default 0
     this.type = 'add', 
+   this.lowStock = 0, // default 0
   });
 
   
@@ -43,6 +45,7 @@ class Productclass {
       'other_qty': otherQty,
       'client_uuid': productClientUuid,
       'type': type,
+      'low_stock_threshold': lowStock, // ✅ Add low stock threshold
     };
   }
 
@@ -60,6 +63,7 @@ class Productclass {
     productClientUuid: map['client_uuid'] as String,
     type: map['type'] ?? 'add',
     byPieces: int.tryParse(map['by_pieces'].toString()) ?? 0,
+    lowStock: map['low_stock_threshold'] ?? 0, // ✅ Add low stock threshold
   );
 }
 

@@ -183,6 +183,7 @@ void notifyProductChanged() {
           isPromo: p['is_promo'] as bool? ?? false,
           otherQty: p['other_qty'] as int? ?? 0,
           clientUuid: p['client_uuid']?.toString(),
+          lowStock: p['low_stock_threshold'] as int? ?? 0,
         );
       }
 
@@ -211,6 +212,7 @@ void notifyProductChanged() {
               isPromo: e['is_promo'] == 1,
               productClientUuid: e['client_uuid'] as String,
               otherQty: e['other_qty'] ?? 0,
+              lowStock: e['low_stock_threshold'] ?? 0,
             ),
           )
           .toList();
@@ -438,6 +440,7 @@ void notifyProductChanged() {
       final stock = p['stock'] as int;
       final isPromo = (p['is_promo'] == 1);
       final otherQty = p['other_qty'] as int? ?? 0;
+      final lowStock = p['low_stock_threshold'] as int? ?? 0;
 
       if (existing != null) {
         // 🔁 Update existing product
@@ -452,6 +455,7 @@ void notifyProductChanged() {
               'by_pieces': byPieces,
               'is_promo': isPromo,
               'other_qty': otherQty,
+              'low_stock_threshold': lowStock,
             })
             .eq('id', existing['id']);
         print("🔁 Updated product '$name' on Supabase");
@@ -467,6 +471,7 @@ void notifyProductChanged() {
           'is_promo': isPromo,
           'other_qty': otherQty,
           'client_uuid': clientUuid,
+          'low_stock_threshold': lowStock,
         });
         print("➕ Inserted product '$name' to Supabase");
       }
@@ -492,6 +497,8 @@ void notifyProductChanged() {
     bool isPromo = false,
     int otherQty = 0,
     required int byPieces, 
+   
+    int lowStock = 0,
   }) async {
     final db = await localDb.database;
 
@@ -511,6 +518,7 @@ void notifyProductChanged() {
       'other_qty': otherQty,
       'is_synced': 0,
       'client_uuid': clientUuid, // ✅ NEVER NULL
+      'low_stock_threshold': lowStock, // ✅ Add low stock threshold
     });
   }
 
@@ -583,6 +591,9 @@ void notifyProductChanged() {
       final stock = p['stock'] is int ? p['stock'] as int : 0;
       final isPromo = (p['is_promo'] ?? 0) == 1;
       final otherQty = p['other_qty'] is int ? p['other_qty'] as int : 0;
+      final lowStock = p['low_stock_threshold'] is int
+          ? p['low_stock_threshold'] as int
+          : 0;
 
       try {
         // 1️⃣ Check if product with same client_uuid exists in Supabase
@@ -605,6 +616,7 @@ void notifyProductChanged() {
                 'stock': stock,
                 'is_promo': isPromo,
                 'other_qty': otherQty,
+                'low_stock_threshold': lowStock,
               })
               .eq('id', existing['id']);
           print("🔁 Updated product '${p['name']}' on Supabase");
@@ -620,6 +632,7 @@ void notifyProductChanged() {
             'is_promo': isPromo,
             'other_qty': otherQty,
             'client_uuid': clientUuid,
+            'low_stock_threshold': lowStock,
           });
           print("➕ Inserted product '${p['name']}' to Supabase");
         }
@@ -680,12 +693,12 @@ void notifyProductChanged() {
               .update({
                 'name': p['name'],
                 'barcode': p['barcode'],
-               
                 'retail_price': p['retail_price'],
                 'cost_price': p['cost_price'],
                 'stock': p['stock'],
                 'is_promo': p['is_promo'] == 1,
                 'other_qty': p['other_qty'],
+                'low_stock_threshold': p['low_stock_threshold'] ?? 0,
               })
               .eq('id', existing['id']);
         } else {
@@ -693,13 +706,13 @@ void notifyProductChanged() {
           await supabase.from('products').insert({
             'name': p['name'],
             'barcode': p['barcode'],
-           
             'retail_price': p['retail_price'],
             'cost_price': p['cost_price'],
             'stock': p['stock'],
             'is_promo': p['is_promo'] == 1,
             'other_qty': p['other_qty'],
             'client_uuid': clientUuid,
+            'low_stock_threshold': p['low_stock_threshold'] ?? 0,
           });
         }
 
@@ -789,6 +802,7 @@ print("SUPABASE PRODUCTS COUNT: ${supaProducts.length}");
           stock: p['stock'] as int,
           isPromo: p['is_promo'] as bool? ?? false,
           otherQty: p['other_qty'] as int? ?? 0,
+          lowStock: p['low_stock_threshold'] as int? ?? 0,
         );
       }
 
@@ -847,6 +861,7 @@ print("SUPABASE PRODUCTS COUNT: ${supaProducts.length}");
     int byPieces,
     bool isPromo,
     int otherQty,
+    int lowStock,
   ) async {
     final clientUuid =
         "P_${DateTime.now().millisecondsSinceEpoch}_${DateTime.now().microsecondsSinceEpoch}";
@@ -861,6 +876,7 @@ print("SUPABASE PRODUCTS COUNT: ${supaProducts.length}");
       'is_promo': isPromo,
       'other_qty': otherQty,
       'client_uuid': clientUuid,
+      'low_stock_threshold': lowStock,
     });
   }
   
@@ -880,6 +896,7 @@ Future<List<Productclass>> getProducts() async {
       isPromo: p['is_promo'] ?? false,
       otherQty: p['other_qty'] ?? 0,
       productClientUuid: (p['client_uuid'] ?? '').toString(),
+      lowStock: p['low_stock_threshold'] ?? 0,
     );
   }).toList();
 }
@@ -1010,6 +1027,7 @@ Future<List<Productclass>> getProducts() async {
 
     final isPromo = (p['is_promo'] ?? 0) == 1;
     final otherQty = p['other_qty'] as int;
+    final lowStock = p['low_stock_threshold'] as int? ?? 0;
 
     try {
       final existing = await supabase
@@ -1032,6 +1050,7 @@ Future<List<Productclass>> getProducts() async {
               'is_promo': isPromo,
               'other_qty': otherQty,
               'updated_at': DateTime.now().toIso8601String(),
+              'low_stock_threshold': lowStock,
             })
             .eq('id', existing['id']);
         print("🔁 Updated product '${p['name']}' on Supabase");
@@ -1048,6 +1067,7 @@ Future<List<Productclass>> getProducts() async {
           'other_qty': otherQty,
           'client_uuid': clientUuid,
           'updated_at': DateTime.now().toIso8601String(),
+          'low_stock_threshold': lowStock,
         });
         print("➕ Inserted product '${p['name']}' to Supabase");
       }
