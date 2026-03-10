@@ -146,6 +146,7 @@ class LocalDatabase {
         retail_price REAL DEFAULT 0,
         by_pieces INTEGER DEFAULT 0,
         stock INTEGER NOT NULL,
+        low_stock_threshold INTEGER DEFAULT 1,
         is_promo INTEGER DEFAULT 0,
         other_qty INTEGER DEFAULT 0,
         is_synced INTEGER DEFAULT 0,

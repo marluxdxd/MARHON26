@@ -265,6 +265,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         title: const Text('Transaction History'),
         bottom: TabBar(
           controller: _tabController,

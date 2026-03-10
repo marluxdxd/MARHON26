@@ -2,25 +2,23 @@ import 'package:cashier/class/productclass.dart';
 import 'package:cashier/services/barcode_scan_service.dart';
 import 'package:cashier/services/product_service.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/svg.dart';
 
 class AddProductPage extends StatefulWidget {
   final Productclass? product; // existing product for edit
-  final String? barcode;       // scanned barcode
+  final String? barcode; // scanned barcode
 
-  const AddProductPage({
-    super.key,
-    this.product,
-    this.barcode,
-  });
+  const AddProductPage({super.key, this.product, this.barcode});
 
   @override
   State<AddProductPage> createState() => _AddProductPageState();
 }
 
-class _AddProductPageState extends State<AddProductPage> {
+class _AddProductPageState extends State<AddProductPage>
+    with SingleTickerProviderStateMixin {
   double pricePerPiece = 0;
   double priceInterest = 0;
-
+  final lowStockController = TextEditingController();
   final barcodeController = TextEditingController();
   final nameController = TextEditingController();
   final stockController = TextEditingController();
@@ -35,14 +33,17 @@ class _AddProductPageState extends State<AddProductPage> {
   bool isPromo = false;
   int otherQty = 0;
 
+  late AnimationController _animController;
+  late Animation<double> _priceAnim;
+
   @override
   void initState() {
     super.initState();
- if (widget.product != null) {
-    print("PRODUCT EDIT MODE");
-    print("CostPrice: ${widget.product!.costPrice}");
-    print("RetailPrice: ${widget.product!.retailPrice}");
-  }
+
+    _animController =
+        AnimationController(vsync: this, duration: const Duration(milliseconds: 400));
+    _priceAnim = Tween<double>(begin: 0, end: 0).animate(_animController);
+
     // Add mode defaults
     if (widget.product == null) {
       byPiecesController.text = "1";
@@ -66,6 +67,12 @@ class _AddProductPageState extends State<AddProductPage> {
         computeInterest();
       });
     }
+  }
+
+  @override
+  void dispose() {
+    _animController.dispose();
+    super.dispose();
   }
 
   /// ===============================
@@ -92,7 +99,7 @@ class _AddProductPageState extends State<AddProductPage> {
       final online = await productService.isOnline1();
 
       if (widget.product == null) {
-        // ⭐ CREATE MODE
+        // CREATE MODE
         await productService.insertProductOffline(
           name: name,
           barcode: barcode,
@@ -104,7 +111,7 @@ class _AddProductPageState extends State<AddProductPage> {
           otherQty: otherQty,
         );
       } else {
-        // ⭐ UPDATE MODE
+        // UPDATE MODE
         final clientUuid = widget.product!.productClientUuid;
         final db = await productService.localDb.database;
 
@@ -124,7 +131,6 @@ class _AddProductPageState extends State<AddProductPage> {
           whereArgs: [clientUuid],
         );
 
-        // ⭐ UPDATE CACHE
         BarcodeScanService.updateProductCache(
           Productclass(
             id: widget.product!.id,
@@ -140,22 +146,18 @@ class _AddProductPageState extends State<AddProductPage> {
           ),
         );
 
-        // ⭐ Optional: sync online if connected
         if (await productService.isOnline2()) {
           await productService.syncSingleProductOnline(widget.product!.id);
         }
       }
 
-      // ⭐ Sync all products if online
       if (online) {
         productService.notifyProductChanged();
         await productService.syncOnlineProducts();
-
         final products = await productService.getAllProducts();
         BarcodeScanService.buildBarcodeCache(products);
       }
 
-      // ⭐ Refresh barcode cache (local)
       final products = await productService.getProducts();
       BarcodeScanService.buildBarcodeCache(products);
 
@@ -182,7 +184,7 @@ class _AddProductPageState extends State<AddProductPage> {
   /// ===============================
   /// CALCULATIONS
   /// ===============================
-  void computePricePerPiece() {
+   void computePricePerPiece() {
     final costPrice = double.tryParse(costPriceController.text) ?? 0;
     final pieces = int.tryParse(byPiecesController.text) ?? 1;
 
@@ -201,85 +203,219 @@ class _AddProductPageState extends State<AddProductPage> {
     });
   }
 
+  void _animatePrice(double oldValue, double newValue) {
+    _priceAnim = Tween<double>(begin: oldValue, end: newValue).animate(
+      CurvedAnimation(parent: _animController, curve: Curves.easeOut),
+    );
+    _animController.forward(from: 0);
+  }
+
   /// ===============================
   /// UI
   /// ===============================
+  InputDecoration buildInputDecoration(String label, IconData icon) {
+    return InputDecoration(
+      labelText: label,
+      prefixIcon: Icon(icon, color: Colors.black54),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Colors.black26),
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      hintStyle: const TextStyle(color: Colors.black45),
+      labelStyle: const TextStyle(color: Colors.black87),
+      filled: true,
+      fillColor: Colors.white,
+    );
+  }
+
+  Widget buildGradientCard({required Widget child}) {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 6),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        color: Colors.white,
+        boxShadow: const [
+          BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2)),
+        ],
+      ),
+      child: child,
+    );
+  }
+
+  Widget buildTwoColumnRow({required Widget left, required Widget right}) {
+    return Row(
+      children: [
+        Expanded(child: left),
+        const SizedBox(width: 10),
+        Expanded(child: right),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isEdit = widget.product != null;
 
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        title: Text(isEdit ? "Edit Product" : "Add Product"),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        title: Text(
+          isEdit ? "Edit Product" : "Add Product",
+          style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+        ),
         iconTheme: const IconThemeData(color: Colors.black),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
         child: Column(
           children: [
             CheckboxListTile(
-              title: const Text("Promo"),
+              title: const Text(
+                "Promo",
+                style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold),
+              ),
               value: isPromo,
+              activeColor: Colors.blueAccent,
               onChanged: (v) => setState(() => isPromo = v ?? false),
             ),
 
-            TextField(
-              controller: barcodeController,
-              readOnly: widget.barcode != null,
-              decoration: const InputDecoration(labelText: "Barcode"),
-            ),
+            buildGradientCard(
+  child: TextField(
+    controller: barcodeController,
+    readOnly: widget.barcode != null,
+    style: const TextStyle(color: Colors.black),
+    decoration: InputDecoration(
+      labelText: "Barcode",
+      prefixIcon: Padding(
+        padding: const EdgeInsets.all(1),
+        child: SvgPicture.asset(
+          "assets/icons/Barcode.svg",
+          width: 20,
+          height: 30,
+        ),
+      ),
+      border: OutlineInputBorder(),
+    ),
+  ),
+),
 
             if (isPromo)
-              TextField(
-                controller: promoQtyController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: "Promo Qty"),
+              buildGradientCard(
+                child: TextField(
+                  controller: promoQtyController,
+                  keyboardType: TextInputType.number,
+                  style: const TextStyle(color: Colors.black),
+                  decoration: buildInputDecoration("Promo Qty", Icons.confirmation_number),
+                ),
               ),
 
-            TextField(
-              controller: nameController,
-              decoration: const InputDecoration(labelText: "Product Name"),
+            buildGradientCard(
+              child: TextField(
+                controller: nameController,
+                style: const TextStyle(color: Colors.black),
+                decoration: buildInputDecoration("Product Name", Icons.label),
+              ),
             ),
 
-            TextField(
-              controller: stockController,
-              keyboardType: TextInputType.number,
-              enabled: widget.product == null,
-              decoration: const InputDecoration(labelText: "Stock"),
+            buildTwoColumnRow(
+              left: buildGradientCard(
+                child: TextField(
+                  controller: stockController,
+                  keyboardType: TextInputType.number,
+                  enabled: widget.product == null,
+                  style: const TextStyle(color: Colors.black),
+                  decoration: buildInputDecoration("Stock", Icons.inventory),
+                ),
+              ),
+              right: buildGradientCard(
+                child: TextField(
+                  controller: lowStockController,
+                  keyboardType: TextInputType.number,
+                  style: const TextStyle(color: Colors.black54),
+                  decoration: buildInputDecoration("Low Stock", Icons.warning)
+                      .copyWith(hintText: "Optional"),
+                ),
+              ),
             ),
 
-            TextField(
-              controller: costPriceController,
-              keyboardType: TextInputType.number,
-              onChanged: (_) => computePricePerPiece(),
-              decoration: const InputDecoration(labelText: "Cost Price"),
+            buildTwoColumnRow(
+              left: buildGradientCard(
+                child: TextField(
+                  controller: costPriceController,
+                  keyboardType: TextInputType.number,
+                  onChanged: (_) => computePricePerPiece(),
+                  style: const TextStyle(color: Colors.black),
+                  decoration: buildInputDecoration("Cost Price", Icons.attach_money),
+                ),
+              ),
+              right: buildGradientCard(
+                child: TextField(
+                  controller: byPiecesController,
+                  keyboardType: TextInputType.number,
+                  onChanged: (_) => computePricePerPiece(),
+                  style: const TextStyle(color: Colors.black),
+                  decoration: buildInputDecoration("By Pieces", Icons.layers),
+                ),
+              ),
             ),
 
-            TextField(
-              controller: byPiecesController,
-              keyboardType: TextInputType.number,
-              onChanged: (_) => computePricePerPiece(),
-              decoration: const InputDecoration(labelText: "By Pieces"),
+            buildGradientCard(
+              child: TextField(
+                controller: retailPriceController,
+                keyboardType: TextInputType.number,
+                onChanged: (_) => computeInterest(),
+                style: const TextStyle(color: Colors.black),
+                decoration: buildInputDecoration("Retail Price", Icons.price_check),
+              ),
             ),
 
-            TextField(
-              controller: retailPriceController,
-              keyboardType: TextInputType.number,
-              onChanged: (_) => computeInterest(),
-              decoration: const InputDecoration(labelText: "Retail Price"),
+            const SizedBox(height: 16),
+
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                AnimatedBuilder(
+                  animation: _priceAnim,
+                  builder: (_, __) => Text(
+                    "Price/pcs: ₱${pricePerPiece.toStringAsFixed(2)}",
+                    style: const TextStyle(
+                        color: Colors.blueAccent, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                Text(
+                  "Interest: ₱${priceInterest.toStringAsFixed(2)}",
+                  style: const TextStyle(
+                      color: Colors.green, fontWeight: FontWeight.bold),
+                ),
+              ],
             ),
 
-            const SizedBox(height: 15),
-            Text("Price per piece: ₱${pricePerPiece.toStringAsFixed(2)}"),
-            Text("Interest: ₱${priceInterest.toStringAsFixed(2)}"),
-            const SizedBox(height: 25),
+            const SizedBox(height: 24),
 
-            ElevatedButton(
-              onPressed: isLoading ? null : saveProduct,
-              child: isLoading
-                  ? const CircularProgressIndicator()
-                  : Text(isEdit ? "Update Product" : "Save Product"),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: isLoading ? null : saveProduct,
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  backgroundColor: Colors.blueAccent,
+                ),
+                child: isLoading
+                    ? const CircularProgressIndicator(color: Colors.white)
+                    : Text(
+                        isEdit ? "Update Product" : "Save Product",
+                        style: const TextStyle(
+                            fontSize: 18, fontWeight: FontWeight.bold),
+                      ),
+              ),
             ),
+            const SizedBox(height: 24),
           ],
         ),
       ),

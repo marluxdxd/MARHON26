@@ -2,49 +2,51 @@ import 'package:flutter/material.dart';
 import 'package:cashier/widget/addproduct.dart';
 import 'package:cashier/class/productclass.dart';
 import 'package:cashier/services/product_service.dart';
-import 'package:cashier/widget/bottom_nav_bar.dart';
 
 class Productview extends StatefulWidget {
-  const Productview({super.key});
+  final String role; // "guest" or "master"
+  const Productview({super.key, required this.role});
 
   @override
   State<Productview> createState() => _ProductviewState();
 }
 
-class _ProductviewState extends State<Productview> {
+class _ProductviewState extends State<Productview> with WidgetsBindingObserver {
+  String _stockFilter = "All"; // All, Low, High
   final ProductService _productService = ProductService();
   final ScrollController _scrollController = ScrollController();
   List<Productclass> _products = [];
   List<Productclass> _filteredProducts = [];
   bool _isLoading = true;
   final searchController = TextEditingController();
+  late bool isGuest;
 
-  void updateLocalProduct(Productclass updatedProduct) {
-    final index = _products.indexWhere((p) => p.id == updatedProduct.id);
-
-    if (index != -1) {
-      setState(() {
-        _products[index] = updatedProduct;
-        _filteredProducts = List.from(_products);
-      });
-    }
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this); // observe app lifecycle
+    isGuest = widget.role == "guest";
+    loadProducts();
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _scrollController.dispose();
     searchController.dispose();
     super.dispose();
   }
 
+  /// Called when app lifecycle changes (like resuming from background)
   @override
-  void initState() {
-    super.initState();
-    loadProducts();
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      loadProducts(); // auto refresh when page comes back into view
+    }
+    super.didChangeAppLifecycleState(state);
   }
 
   /// ---------------- LOAD PRODUCTS ----------------
-
   Future<void> loadProducts() async {
     if (!mounted) return;
 
@@ -57,56 +59,77 @@ class _ProductviewState extends State<Productview> {
 
       setState(() {
         _products = products;
-        _filteredProducts = products;
-        sortProductsAlphabetically();
+        _filteredProducts = List.from(products);
       });
+
+      filterByStock(); // apply current stock filter
     } catch (e) {
       print("Load error: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Failed to load products: $e")),
+        );
+      }
     }
 
-    setState(() => _isLoading = false);
+    if (mounted) setState(() => _isLoading = false);
   }
 
   /// ---------------- SEARCH FILTER ----------------
-
   void filterSearch(String query) {
-    final filtered = _products.where((p) {
+    List<Productclass> filtered = _products.where((p) {
       return p.name.toLowerCase().contains(query.toLowerCase());
     }).toList();
-    _filteredProducts = filtered;
- sortProductsAlphabetically();
-    setState(() => _filteredProducts = filtered);
+
+    setState(() {
+      _filteredProducts = filtered;
+    });
+
+    filterByStock(); // apply stock filter on top
   }
 
-  /// ---------------- DELETE PRODUCT (POS SAFE) ----------------
+  /// ---------------- STOCK FILTER ----------------
+  void filterByStock() {
+    List<Productclass> filtered = List.from(_filteredProducts);
 
+    if (_stockFilter == "Low") {
+      filtered = filtered.where((p) => p.stock <= 5).toList(); // low stock
+    } else if (_stockFilter == "High") {
+      filtered = filtered.where((p) => p.stock >= 50).toList(); // high stock
+    }
 
-/// ---------------- SORT ALPHABETICALLY ----------------
-void sortProductsAlphabetically() {
-  _filteredProducts.sort((a, b) {
-    String firstWordA = a.name.split(' ').first.toLowerCase();
-    String firstWordB = b.name.split(' ').first.toLowerCase();
-    return firstWordA.compareTo(firstWordB);
-  });
+    setState(() {
+      _filteredProducts = filtered;
+    });
 
-  setState(() {}); // Para ma-refresh ang UI
-}
+    sortProductsAlphabetically();
+  }
 
+  /// ---------------- SORT ALPHABETICALLY ----------------
+  void sortProductsAlphabetically() {
+    _filteredProducts.sort((a, b) {
+      String firstWordA = a.name.split(' ').first.toLowerCase();
+      String firstWordB = b.name.split(' ').first.toLowerCase();
+      return firstWordA.compareTo(firstWordB);
+    });
+    setState(() {});
+  }
 
-
-
+  /// ---------------- DELETE PRODUCT ----------------
   Future<void> deleteProduct(Productclass product) async {
+    if (isGuest) return; // guest cannot delete
+
     try {
       final db = await _productService.localDb.database;
 
-      /// ⭐ Delete locally first
+      // Delete locally first
       await db.delete(
         "products",
         where: "client_uuid = ?",
         whereArgs: [product.productClientUuid],
       );
 
-      /// ⭐ Delete from Supabase
+      // Delete from Supabase
       if (product.productClientUuid.isNotEmpty) {
         await _productService.supabase
             .from("products")
@@ -126,18 +149,47 @@ void sortProductsAlphabetically() {
     }
   }
 
-  /// ---------------- UI ----------------
+  /// ---------------- UPDATE LOCAL PRODUCT ----------------
+  void updateLocalProduct(Productclass updatedProduct) {
+    final index = _products.indexWhere((p) => p.id == updatedProduct.id);
 
+    if (index != -1) {
+      setState(() {
+        _products[index] = updatedProduct;
+        _filteredProducts = List.from(_products);
+      });
+      filterByStock(); // apply current stock filter
+    }
+  }
+
+  /// ---------------- UI ----------------
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Products")),
-
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        title: const Text("Products"),
+        actions: [
+          Text('sort'),
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.filter_alt),
+            onSelected: (value) {
+              _stockFilter = value;
+              filterByStock();
+            },
+            itemBuilder: (context) => const [
+              PopupMenuItem(value: "All", child: Text("All Stocks")),
+              PopupMenuItem(value: "Low", child: Text("Low Stock")),
+              PopupMenuItem(value: "High", child: Text("High Stock")),
+            ],
+          ),
+        ],
+      ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : Column(
               children: [
-                /// ⭐ Search Box
+                // Search Box
                 Padding(
                   padding: const EdgeInsets.all(12),
                   child: TextField(
@@ -153,7 +205,7 @@ void sortProductsAlphabetically() {
                   ),
                 ),
 
-                /// ⭐ Product List
+                // Product List
                 Expanded(
                   child: _filteredProducts.isEmpty
                       ? const Center(child: Text("No products found"))
@@ -167,17 +219,15 @@ void sortProductsAlphabetically() {
 
                               return Dismissible(
                                 key: Key(product.productClientUuid),
-
                                 direction: DismissDirection.endToStart,
-
                                 confirmDismiss: (_) async {
+                                  if (isGuest) return false;
                                   return await showDialog(
                                     context: context,
                                     builder: (_) => AlertDialog(
                                       title: const Text("Delete Product"),
                                       content: const Text(
-                                        "Delete this product permanently?",
-                                      ),
+                                          "Delete this product permanently?"),
                                       actions: [
                                         TextButton(
                                           onPressed: () =>
@@ -196,11 +246,12 @@ void sortProductsAlphabetically() {
                                     ),
                                   );
                                 },
-
-                                onDismissed: (_) {
-                                  deleteProduct(product);
+                                onDismissed: (_) async {
+                                  setState(() {
+                                    _filteredProducts.removeAt(index);
+                                  });
+                                  await deleteProduct(product);
                                 },
-
                                 background: Container(
                                   alignment: Alignment.centerRight,
                                   padding: const EdgeInsets.only(right: 20),
@@ -210,21 +261,17 @@ void sortProductsAlphabetically() {
                                     color: Colors.white,
                                   ),
                                 ),
-
                                 child: Card(
                                   margin: const EdgeInsets.symmetric(
                                     horizontal: 12,
                                     vertical: 6,
                                   ),
-
                                   child: ListTile(
-                                  title: Text(product.name.toUpperCase()),
-
+                                    title: Text(product.name.toUpperCase()),
                                     subtitle: Text(
                                       "Cost: ₱${product.costPrice.toStringAsFixed(2)}\n"
                                       "Retail: ₱${product.retailPrice.toStringAsFixed(2)}",
                                     ),
-
                                     trailing: Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
@@ -240,7 +287,6 @@ void sortProductsAlphabetically() {
                                                 fontWeight: FontWeight.bold,
                                               ),
                                             ),
-
                                             if (product.isPromo)
                                               const Text(
                                                 "PROMO",
@@ -251,32 +297,30 @@ void sortProductsAlphabetically() {
                                               ),
                                           ],
                                         ),
-
                                         const SizedBox(width: 8),
-
-                                        /// ⭐ EDIT BUTTON
-                                        IconButton(
-                                          icon: const Icon(
-                                            Icons.edit,
-                                            color: Colors.blue,
-                                          ),
-
-                                          onPressed: () {
-                                            Navigator.push(
-                                              context,
-                                              MaterialPageRoute(
-                                                builder: (_) => AddProductPage(
-                                                  product: product,
+                                        if (!isGuest)
+                                          IconButton(
+                                            icon: const Icon(
+                                              Icons.edit,
+                                              color: Colors.blue,
+                                            ),
+                                            onPressed: () {
+                                              Navigator.push(
+                                                context,
+                                                MaterialPageRoute(
+                                                  builder: (_) =>
+                                                      AddProductPage(
+                                                    product: product,
+                                                  ),
                                                 ),
-                                              ),
-                                            ).then((result) {
-                                              if (result != null &&
-                                                  result is Productclass) {
-                                                updateLocalProduct(result);
-                                              }
-                                            });
-                                          },
-                                        ),
+                                              ).then((result) {
+                                                if (result != null &&
+                                                    result is Productclass) {
+                                                  updateLocalProduct(result);
+                                                }
+                                              });
+                                            },
+                                          ),
                                       ],
                                     ),
                                   ),
@@ -288,18 +332,17 @@ void sortProductsAlphabetically() {
                 ),
               ],
             ),
-      
-
-      /// ⭐ Add Product Button
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const AddProductPage()),
-          ).then((_) => loadProducts());
-        },
-        child: const Icon(Icons.add),
-      ),
+      floatingActionButton: isGuest
+          ? null
+          : FloatingActionButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const AddProductPage()),
+                ).then((_) => loadProducts());
+              },
+              child: const Icon(Icons.add),
+            ),
     );
   }
 }

@@ -183,23 +183,44 @@ class _BarcodeScannerPageState extends State<BarcodeScannerPage> {
             ),
           ),
 
-          // Torch toggle
+          // Torch toggle using Stack + GestureDetector
           Positioned(
-  top: screenHeight * 0.08,
-  left: (screenWidth - 56) / 2, // 56 kay default size sa FloatingActionButton
-  child: FloatingActionButton(
-    mini: true,
-    backgroundColor: Colors.white70,
-    onPressed: () async {
-      await controller.toggleTorch();
-      setState(() => isTorchOn = !isTorchOn);
-    },
-    child: Icon(
-      isTorchOn ? Icons.flashlight_on : Icons.flashlight_off,
-      color: isTorchOn ? Colors.white : Colors.black,
-    ),
-  ),
-),
+            top: screenHeight * 0.08,
+            left: (screenWidth - 60) / 2, // adjust para center
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                // Circle background
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: isTorchOn ? Colors.yellowAccent : Colors.white70,
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Colors.black26,
+                        blurRadius: 6,
+                        offset: Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                ),
+                // Icon with GestureDetector
+                GestureDetector(
+                  onTap: () async {
+                    await controller.toggleTorch();
+                    setState(() => isTorchOn = !isTorchOn);
+                  },
+                  child: Icon(
+                    isTorchOn ? Icons.flashlight_on : Icons.flashlight_off,
+                    color: Colors.black,
+                    size: 28,
+                  ),
+                ),
+              ],
+            ),
+          ),
 
           // Product preview
           if (scannedProduct != null)

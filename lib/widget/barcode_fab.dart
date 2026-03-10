@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 class BarcodeFAB extends StatelessWidget {
   final VoidCallback onPressed;
@@ -28,11 +29,7 @@ class BarcodeFAB extends StatelessWidget {
                 width: 2,
               ),
             ),
-            child: const Icon(
-              Icons.qr_code_scanner_sharp,
-              size: 30,
-              color: Colors.black,
-            ),
+            child: SvgPicture.asset('assets/icons/Barcode.svg', width: 24, height: 44,color: Colors.black,),
           ),
           const SizedBox(height: 4),
           const Text(

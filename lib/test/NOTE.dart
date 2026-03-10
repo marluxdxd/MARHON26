@@ -153,3 +153,12 @@
 //               //ARI SA NAKO GI BUTANG TONG AUTO ON-OFF (POS NEXT ROW)
 
 //               //to be continued sa main_navigation.dart kay daghan na siya code and para dili maglibog
+
+          // IconButton(
+          //   icon: const Icon(Icons.refresh, color: Colors.black),
+          //   onPressed: () async {
+          //     await productService.syncOfflineProducts();
+          //     await productService.syncOnlineProducts();
+          //     await transactionService.syncOfflineTransactions();
+          //   },
+          // ),

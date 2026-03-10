@@ -5,16 +5,13 @@ import 'package:cashier/services/product_service.dart';
 import 'package:cashier/services/transaction_promo_service.dart';
 import 'package:cashier/services/transaction_service.dart';
 import 'package:cashier/utils.dart';
-import 'package:cashier/widget/appdrawer.dart';
 import 'package:cashier/class/pos_row_manager.dart';
 import 'package:cashier/class/productclass.dart';
-import 'package:cashier/widget/sukli.dart';
+import 'package:cashier/widget/qtybottomsheet.dart';
 import 'package:flutter/material.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:internet_connection_checker/internet_connection_checker.dart';
 import 'dart:async';
-
-import 'package:uuid/uuid.dart';
 
 // ------------------ Helper ------------------
 String generateUniqueId({String prefix = "S"}) {
@@ -39,8 +36,10 @@ class Home extends StatefulWidget {
   State<Home> createState() => _HomeState();
 }
 
-class _HomeState extends State<Home> {
+class _HomeState extends State<Home> with SingleTickerProviderStateMixin {
   late POSRowManager posManager;
+  late TabController _tabController;
+
   bool isSyncingOnline = false;
   bool isSyncing = false;
   bool syncSuccess = false;
@@ -56,10 +55,14 @@ class _HomeState extends State<Home> {
   @override
   void initState() {
     super.initState();
+    posManager = widget.posManager;
 
-    _listener = InternetConnectionChecker().onStatusChange.listen((
-      status,
-    ) async {
+    _tabController = TabController(length: 2, vsync: this);
+    _tabController.addListener(() {
+      setState(() {}); // rebuild to update tab colors
+    });
+
+    _listener = InternetConnectionChecker().onStatusChange.listen((status) async {
       if (status == InternetConnectionStatus.connected) {
         await productService.syncOfflineProducts();
         await productService.syncOnlineProducts();
@@ -67,419 +70,212 @@ class _HomeState extends State<Home> {
       }
     });
 
-    _connectivityListener = Connectivity().onConnectivityChanged.listen((
-      status,
-    ) {
-      if (status != ConnectivityResult.none) {}
-    });
+    _connectivityListener = Connectivity().onConnectivityChanged.listen((status) {});
   }
-
-  void _updateUI() => setState(() {});
 
   @override
   void dispose() {
     _listener?.cancel();
     _connectivityListener?.cancel();
     customerCashController.dispose();
+    _tabController.dispose();
     super.dispose();
   }
 
-  Widget _buildMainContent(
-    Orientation orientation,
-    BoxConstraints constraints,
-  ) {
-    double screenWidth = constraints.maxWidth;
-    double screenHeight = constraints.maxHeight;
-    bool isTablet = screenWidth > 600;
+  void _updateUI() => setState(() {});
 
-    double padding = isTablet ? 24 : 16;
-    double fontSizeTitle = isTablet ? 28 : 20;
-    double fontSizeValue = isTablet ? 28 : 20;
-
-    if (orientation == Orientation.portrait) {
-      return Padding(
-        padding: EdgeInsets.all(padding),
-        child: Column(
-          children: [
-            Expanded(
-              child: ListView.builder(
-                itemCount: widget.posManager.rows.length,
-                itemBuilder: (_, index) => widget.posManager.buildRow(
-                  widget.posManager.rows[index],
-                  index,
-                  onUpdate: _updateUI,
-                  isAutoNextRowOn: widget.isAutoNextRowOn,
-                ),
-              ),
-            ),
-            const SizedBox(height: 10),
-            Container(
-              padding: EdgeInsets.symmetric(
-                vertical: padding,
-                horizontal: padding,
-              ),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(15),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Total Bill:',
-                    style: TextStyle(
-                      fontSize: fontSizeTitle,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  Text(
-                    "₱${widget.posManager.totalBill.toStringAsFixed(2)}",
-                    style: TextStyle(
-                      color: Colors.red,
-                      fontSize: fontSizeValue,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-                  controller: customerCashController,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: "Customer Cash",
-                    border: OutlineInputBorder(),
-                  ),
-                  onSubmitted: (_) async {
-                if (isSyncingOnline) return;
-
-                final localDbPromo = LocalDbTransactionpromo();
-                final double finalTotal = posManager.totalBill;
-                double cash = double.tryParse(customerCashController.text) ?? 0;
-
-                if (!transactionService.isCashSufficient(finalTotal, cash)) {
-                  print("Cash is not enough yet.");
-                  return;
-                }
-
-                setState(() => isSyncingOnline = true);
-
-                final bool online =
-                    await InternetConnectionChecker().hasConnection;
-
-                final localDb = LocalDatabase();
-                double change = transactionService.calculateChange(
-                  finalTotal,
-                  cash,
-                );
-                String timestamp = getPhilippineTimestampFormatted();
-
-                // ---------------- COMBINE SAME PRODUCTS ----------------
-                final Map<int, POSRow> combinedItems = {};
-
-                for (final row in posManager.rows) {
-                  if (row.product == null) continue;
-
-                  final product = row.product!;
-                  final qty = row.isPromo ? row.otherQty : row.qty;
-
-                  if (combinedItems.containsKey(product.id)) {
-                    combinedItems[product.id]!.qty += qty;
-                  } else {
-                    combinedItems[product.id] = POSRow(
-                      product: product,
-                      qty: qty,
-                      isPromo: row.isPromo,
-                      otherQty: row.otherQty,
-                    );
-                  }
-                }
-
-                // ---------------- SAVE PROMO COUNTS PER PRODUCT ----------------
-                final Map<int, int> savedPromoCounts = Map.from(
-                  posManager.promoCountByProduct,
-                );
-
-                // ---------------- SHOW UI IMMEDIATELY ----------------
-                if (mounted) {
-                  showDialog(
-                    context: context,
-                    builder: (_) => Sukli(change: change, timestamp: timestamp),
-                  );
-                  customerCashController.clear();
-                  posManager.reset2();
-                  posManager.reset();
-                  _updateUI();
-                }
-
-                // ---------------- PROCESS TRANSACTION IN BACKGROUND ----------------
-                unawaited(
-                  Future(() async {
-                    try {
-                      final String clientUuid = const Uuid().v4();
-
-                      final int localTransactionId = await localDb
-                          .insertTransaction(
-                            total: finalTotal,
-                            cash: cash,
-                            change: change,
-                            createdAt: timestamp,
-                            isSynced: online ? 1 : 0,
-                            clientUuid: clientUuid,
-                          );
-
-                      int? onlineTransactionId;
-
-                      if (online) {
-                        onlineTransactionId = await transactionService
-                            .saveTransaction(
-                              total: finalTotal,
-                              cash: cash,
-                              change: change,
-                              clientUuid: clientUuid,
-                            );
-
-                        await localDb.updateTransactionSupabaseId(
-                          localId: localTransactionId,
-                          supabaseId: onlineTransactionId,
-                        );
-                      }
-
-                      // ✅ TRACK PROMO INSERT PER PRODUCT.ID
-                      final Set<int> insertedPromoProducts = {};
-                      final promoService = TransactionPromoService();
-                      final futures = combinedItems.values.map((row) async {
-                        final product = row.product!;
-                        final qtySold = row.qty;
-
-                        final promoCount = savedPromoCounts[product.id] ?? 0;
-
-                        int? oldStock = await localDb.getProductStock(
-                          product.id,
-                        );
-
-                        int newStock = oldStock != null
-                            ? oldStock - qtySold
-                            : 0;
-
-                        await Future.wait([
-                          // ---------------- INSERT PROMO (ONCE PER PRODUCT) ----------------
-                          if (row.isPromo &&
-                              promoCount > 0 &&
-                              !insertedPromoProducts.contains(product.id))
-                            () async {
-                              insertedPromoProducts.add(product.id);
-
-                              print(
-                                '🔥 INSERT PROMO | tx:$localTransactionId '
-                                'product:${product.id} count:$promoCount',
-                              );
-                              // Offline insert
-                              await localDbPromo.insertTransactionPromo(
-                                transactionId: localTransactionId,
-                                productId: product.id,
-                                productName: product.name,
-                                promoCount: promoCount,
-                                retailPrice: product.retailPrice,
-                                isSynced: online ? 1 : 0,
-                              );
-                              // Online insert if connected
-                              if (online && onlineTransactionId != null) {
-                                await promoService.insertTransactionPromo(
-                                  transactionId: onlineTransactionId,
-                                  productId: product.id,
-                                  productName: product.name,
-                                  promoCount: promoCount,
-                                  retailPrice: product.retailPrice,
-                                );
-                              }
-                            }(),
-
-                          // ---------------- INSERT TRANSACTION ITEM ----------------
-                          localDb.insertTransactionItem(
-                            transactionId: localTransactionId,
-                            productId: product.id,
-                            productName: product.name,
-                            qty: qtySold,
-                            retailPrice: product.retailPrice,
-                            costPrice: product.costPrice,
-                            isPromo: product.isPromo,
-                            otherQty: product.otherQty,
-                            productClientUuid: product.productClientUuid,
-                          ),
-
-                          if (oldStock != null)
-                            localDb.updateProductStock(product.id, newStock),
-
-                          if (oldStock != null)
-                            localDb.insertStockHistory(
-                              transactionId: localTransactionId,
-                              id: generateUniqueId(prefix: "H").hashCode.abs(),
-                              productId: product.id,
-                              productName: product.name,
-                              oldStock: oldStock,
-                              qtyChanged: qtySold,
-                              newStock: newStock,
-                              type: 'SALE',
-                              createdAt: timestamp,
-                              synced: online ? 1 : 0,
-                              productClientUuid: product.productClientUuid,
-                            ),
-
-                          localDb.insertStockUpdateQueue1(
-                            productId: product.id,
-                            qty: qtySold,
-                            type: 'SALE',
-                          ),
-
-                          if (online && onlineTransactionId != null)
-                            Future.wait([
-                              productService.syncSingleProductOnline(
-                                product.id,
-                              ),
-                              transactionService.saveTransactionItem(
-                                transactionId: onlineTransactionId,
-                                product: product,
-                                qty: qtySold,
-                                isPromo: product.isPromo,
-                                otherQty: product.otherQty,
-                              ),
-                            ]),
-                        ]);
-                      }).toList();
-
-                      await Future.wait(futures);
-
-                      if (online) {
-                        await productService.syncOnlineProducts();
-                        await productService.syncOfflineStockHistory();
-                        await productService.syncOfflineProducts();
-                      }
-
-                      print("✅ TRANSACTION SUCCESS");
-                    } catch (e) {
-                      print("❌ Error saving transaction: $e");
-                    } finally {
-                      if (mounted) {
-                        setState(() => isSyncingOnline = false);
-                      }
-                    }
-                  }),
-                );
-              },
-            
-            ),
-          ],
-        ),
-      );
-    }
-
-    // Landscape layout
-    return Row(
-      children: [
-        Expanded(
-          flex: 2,
-          child: Padding(
-            padding: EdgeInsets.all(padding),
+  // ============================
+  // POS TAB
+  // ============================
+  Widget _buildPOSTab() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        children: [
+          Expanded(
             child: ListView.builder(
-              itemCount: widget.posManager.rows.length,
-              itemBuilder: (_, index) => widget.posManager.buildRow(
-                widget.posManager.rows[index],
+              itemCount: posManager.rows.length,
+              itemBuilder: (_, index) => posManager.buildRow(
+                posManager.rows[index],
                 index,
                 onUpdate: _updateUI,
                 isAutoNextRowOn: widget.isAutoNextRowOn,
               ),
             ),
           ),
-        ),
-        Expanded(
-          flex: 1,
-          child: Padding(
-            padding: EdgeInsets.all(padding),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.start,
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(15),
+              border: Border.all(color: Colors.grey),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Container(
-                  padding: EdgeInsets.all(padding),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(15),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Total Bill:',
-                        style: TextStyle(
-                          fontSize: fontSizeTitle,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      Text(
-                        "₱${widget.posManager.totalBill.toStringAsFixed(2)}",
-                        style: TextStyle(
-                          color: Colors.red,
-                          fontSize: fontSizeValue,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
+                const Text(
+                  'Total Bill:',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                ),
+                Text(
+                  "₱${posManager.totalBill.toStringAsFixed(2)}",
+                  style: const TextStyle(
+                    color: Colors.red,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
                   ),
                 ),
-                const SizedBox(height: 20),
-                TextField(
-                  controller: customerCashController,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: "Customer Cash",
-                    border: OutlineInputBorder(),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+          TextField(
+            controller: customerCashController,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(
+              labelText: "Customer Cash",
+              border: OutlineInputBorder(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ============================
+  // LOW STOCK TAB
+  // ============================
+  Widget _buildLowStockTab() {
+    final lowStockProducts = widget.products.where((p) => p.stock <= 3).toList();
+
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      itemCount: lowStockProducts.length,
+      itemBuilder: (context, index) {
+        final product = lowStockProducts[index];
+        return Card(
+          margin: const EdgeInsets.symmetric(vertical: 6),
+          child: ListTile(
+            title: Text(product.name),
+            subtitle: Text("Stock: ${product.stock}"),
+            trailing: Text("₱${product.retailPrice.toStringAsFixed(2)}"),
+            onTap: () async {
+              final qty = await showModalBottomSheet<int>(
+                context: context,
+                builder: (_) => Qtybottomsheet(stock: product.stock),
+              );
+
+              if (qty != null) {
+                final row = posManager.rows.firstWhere(
+                  (r) => r.product == null,
+                  orElse: () {
+                    posManager.addEmptyRow();
+                    return posManager.rows.last;
+                  },
+                );
+                row.product = product;
+                row.qty = qty;
+                row.otherQty = product.otherQty;
+                _updateUI();
+              }
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  // ============================
+  // CUSTOM TAB WIDGET
+  // ============================
+  Widget _buildCustomTab(String text, int index) {
+    bool selected = _tabController.index == index;
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+      decoration: BoxDecoration(
+        color: selected ? Colors.blue : Colors.transparent,
+        borderRadius: const BorderRadius.only(
+      topLeft: Radius.circular(5),
+      topRight: Radius.circular(5),
+    ),
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        text,
+        style: TextStyle(
+          color: selected ? Colors.white : Colors.black,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
+  }
+
+  // ============================
+  // BUILD HOME
+  // ============================
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        backgroundColor: Colors.white,
+        elevation: 0,
+        centerTitle: false,
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: const [
+            Icon(Icons.storefront_sharp, size: 40, color: Colors.black),
+            SizedBox(width: 4),
+            Text(
+              'Barato',
+              style: TextStyle(
+                color: Colors.black,
+                fontWeight: FontWeight.bold,
+                fontSize: 13,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.mail_outline_outlined, size: 30, color: Colors.black),
+            onPressed: () {
+              Navigator.pushNamed(context, "/profile").then((_) => widget.refreshUI());
+            },
+          ),
+        ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(48),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => _tabController.animateTo(0),
+                    child: _buildCustomTab("POS", 0),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => _tabController.animateTo(1),
+                    child: _buildCustomTab("Low Stock", 1),
                   ),
                 ),
               ],
             ),
           ),
         ),
-      ],
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
- backgroundColor: Colors.white, // color nga gusto nimo
-  elevation: 1.0,
-  centerTitle: false, // para dili center
-  title: Row(
-    mainAxisSize: MainAxisSize.min, // dili mo-occupy full width
-    children: const [
-     
-      Icon(
-        Icons.storefront_sharp,
-        size: 30,
-        color: Colors.black,
       ),
-       Text(
-        'Halin',
-        style: TextStyle(
-          color: Colors.black,
-          fontWeight: FontWeight.bold,
-          fontSize: 13,
-        ),
-      ),
-    ],
-  ),
-),
-      body: OrientationBuilder(
-        builder: (context, orientation) {
-          return LayoutBuilder(
-            builder: (context, constraints) {
-              return _buildMainContent(orientation, constraints);
-            },
-          );
-        },
+      body: TabBarView(
+        controller: _tabController,
+        children: [
+          _buildPOSTab(),
+          _buildLowStockTab(),
+        ],
       ),
     );
   }

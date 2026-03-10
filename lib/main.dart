@@ -4,6 +4,7 @@ import 'package:cashier/services/stock_history_sync.dart';
 import 'package:cashier/services/transaction_promo_service.dart';
 import 'package:cashier/services/transaction_service.dart';
 import 'package:cashier/services/transactionitem_service.dart';
+import 'package:cashier/view/login.dart';
 import 'package:cashier/widget/main_navigation.dart';
 import 'package:cashier/view/home.dart';
 import 'package:flutter/material.dart';
@@ -49,7 +50,7 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
       ),
-      home:  MainNav(),
+      home:  LoginScreen(),
     );
   }
 }
