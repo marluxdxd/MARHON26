@@ -242,7 +242,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen>
                       // Quantity
                       Expanded(
                         flex: 2,
-                        child: Text('${qty}', textAlign: TextAlign.center),
+                        child: Text('$qty', textAlign: TextAlign.center),
                       ),
 
                       // Subtotal / Total

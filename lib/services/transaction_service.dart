@@ -353,9 +353,7 @@ Future<int> saveTransaction({
     // Join transaction_items with transactions to get created_at
     final res = await supabase
         .from('transaction_items')
-        .select('*, transaction:transactions(*)'); // fetch transaction data as nested object
-
-    if (res == null) return [];
+        .select('*, transaction:transactions(*)');
 
     // Convert to List<Map<String, dynamic>>
     final items = List<Map<String, dynamic>>.from(res as List);
@@ -365,7 +363,6 @@ Future<int> saveTransaction({
   /// Fetch all transactions (optional)
   Future<List<Map<String, dynamic>>> fetchAllTransactions1() async {
     final res = await supabase.from('transactions').select('*');
-    if (res == null) return [];
     return List<Map<String, dynamic>>.from(res as List);
   }
 }

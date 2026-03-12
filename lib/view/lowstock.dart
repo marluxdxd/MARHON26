@@ -18,6 +18,7 @@ class LowStock extends StatelessWidget {
       itemCount: lowStockProducts.length,
       itemBuilder: (context, index) {
         final product = lowStockProducts[index];
+        return null;
 
         // return Card(
         //   child: ListTile(

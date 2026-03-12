@@ -49,7 +49,7 @@ void main() async {
 
 class MyApp extends StatelessWidget {
   final String? initialRole; // Accept saved role
-  MyApp({super.key, this.initialRole});
+  const MyApp({super.key, this.initialRole});
 
   @override
   Widget build(BuildContext context) {

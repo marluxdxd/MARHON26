@@ -1,7 +1,5 @@
 import 'package:cashier/screens/debug_db_screen.dart';
 import 'package:cashier/view/history_stock_screen.dart';
-import 'package:cashier/view/home.dart';
-import 'package:cashier/view/productview.dart';
 import 'package:cashier/view/reports_file/sales_reports_screen.dart';
 import 'package:cashier/view/stock_screnn.dart';
 import 'package:cashier/view/transaction_history.dart';

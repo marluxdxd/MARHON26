@@ -1264,5 +1264,7 @@ Future<List<Productclass>> getProducts() async {
     return result.isNotEmpty;
   }
 
-  Future<Object?> mapToProductClass(Map<String, Object?> first) async {}
+  Future<Object?> mapToProductClass(Map<String, Object?> first) async {
+    return null;
+  }
 }

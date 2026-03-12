@@ -1,6 +1,5 @@
 import 'package:cashier/database/local_db.dart';
 import 'package:cashier/database/supabase.dart';
-import 'package:internet_connection_checker/internet_connection_checker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 

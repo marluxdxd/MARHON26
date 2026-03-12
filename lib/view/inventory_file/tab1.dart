@@ -40,7 +40,9 @@ class _StockScreenState extends State<StockScreen>
   void dispose() {
     searchController.dispose();
     isSyncing.dispose();
-    _stockControllers.values.forEach((c) => c.dispose());
+    for (var c in _stockControllers.values) {
+      c.dispose();
+    }
     _connectivitySubscription?.cancel();
     super.dispose();
   }
@@ -255,7 +257,7 @@ class _StockScreenState extends State<StockScreen>
         // Loading overlay
         ValueListenableBuilder<bool>(
           valueListenable: isSyncing,
-          builder: (_, loading, __) {
+          builder: (_, loading, _) {
             if (!loading) return const SizedBox.shrink();
             return Container(
               color: Colors.black54,

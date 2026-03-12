@@ -1,11 +1,11 @@
 import 'package:cashier/class/posrowclass.dart';
 import 'package:cashier/database/local_db.dart';
 import 'package:cashier/database/local_db_transactionpromo.dart';
+import 'package:cashier/notification_service.dart';
 import 'package:cashier/services/product_service.dart';
 import 'package:cashier/services/transaction_promo_service.dart';
 import 'package:cashier/services/transaction_service.dart';
 import 'package:cashier/utils.dart';
-import 'package:cashier/widget/appdrawer.dart';
 import 'package:cashier/class/pos_row_manager.dart';
 import 'package:cashier/class/productclass.dart';
 import 'package:cashier/widget/sukli.dart';
@@ -13,15 +13,14 @@ import 'package:flutter/material.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:internet_connection_checker/internet_connection_checker.dart';
 import 'dart:async';
-
 import 'package:uuid/uuid.dart';
 
-// ------------------ Helper ------------------
 String generateUniqueId({String prefix = "S"}) {
   return "$prefix${DateTime.now().millisecondsSinceEpoch}";
 }
 
 class Home extends StatefulWidget {
+  
   final POSRowManager posManager;
   final List<Productclass> products;
   final bool isAutoNextRowOn;
@@ -40,10 +39,9 @@ class Home extends StatefulWidget {
 }
 
 class _HomeState extends State<Home> {
+  final NotificationsServices notificationsServices = NotificationsServices();
+
   late POSRowManager posManager;
-  bool isSyncingOnline = false;
-  bool isSyncing = false;
-  bool syncSuccess = false;
 
   StreamSubscription<InternetConnectionStatus>? _listener;
   StreamSubscription<ConnectivityResult>? _connectivityListener;
@@ -52,14 +50,19 @@ class _HomeState extends State<Home> {
 
   final TransactionService transactionService = TransactionService();
   final ProductService productService = ProductService();
+  
+  bool isSyncingOnline = false;
 
   @override
   void initState() {
     super.initState();
+
     posManager = widget.posManager;
-    _listener = InternetConnectionChecker().onStatusChange.listen((
-      status,
-    ) async {
+
+    notificationsServices.initialiseNotification();
+
+    _listener =
+        InternetConnectionChecker().onStatusChange.listen((status) async {
       if (status == InternetConnectionStatus.connected) {
         await productService.syncOfflineProducts();
         await productService.syncOnlineProducts();
@@ -67,11 +70,8 @@ class _HomeState extends State<Home> {
       }
     });
 
-    _connectivityListener = Connectivity().onConnectivityChanged.listen((
-      status,
-    ) {
-      if (status != ConnectivityResult.none) {}
-    });
+    _connectivityListener =
+        Connectivity().onConnectivityChanged.listen((status) {});
   }
 
   void _updateUI() => setState(() {});
@@ -84,67 +84,63 @@ class _HomeState extends State<Home> {
     super.dispose();
   }
 
-  Widget _buildMainContent(
-    Orientation orientation,
-    BoxConstraints constraints,
-  ) {
-    double screenWidth = constraints.maxWidth;
-    double screenHeight = constraints.maxHeight;
-    bool isTablet = screenWidth > 600;
+  Widget _buildMainContent() {
+    double padding = 16;
+    double fontSizeTitle = 20;
+    double fontSizeValue = 20;
 
-    double padding = isTablet ? 24 : 16;
-    double fontSizeTitle = isTablet ? 28 : 20;
-    double fontSizeValue = isTablet ? 28 : 20;
+    return Padding(
+      padding: EdgeInsets.all(padding),
+      child: Column(
+        children: [
+          Expanded(
+            child: ListView.builder(
+              itemCount: widget.posManager.rows.length,
+              itemBuilder: (_, index) => widget.posManager.buildRow(
+                widget.posManager.rows[index],
+                index,
+                onUpdate: _updateUI,
+                isAutoNextRowOn: widget.isAutoNextRowOn,
+              ),
+            ),
+          ),
 
-    if (orientation == Orientation.portrait) {
-      return Padding(
-        padding: EdgeInsets.all(padding),
-        child: Column(
-          children: [
-            Expanded(
-              child: ListView.builder(
-                itemCount: widget.posManager.rows.length,
-                itemBuilder: (_, index) => widget.posManager.buildRow(
-                  widget.posManager.rows[index],
-                  index,
-                  onUpdate: _updateUI,
-                  isAutoNextRowOn: widget.isAutoNextRowOn,
+          const SizedBox(height: 10),
+
+          Container(
+            padding: EdgeInsets.symmetric(
+              vertical: padding,
+              horizontal: padding,
+            ),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(15),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                Text(
+                  'Total Bill:',
+                  style: TextStyle(
+                    fontSize: fontSizeTitle,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-              ),
-            ),
-            const SizedBox(height: 10),
-            Container(
-              padding: EdgeInsets.symmetric(
-                vertical: padding,
-                horizontal: padding,
-              ),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(15),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Total Bill:',
-                    style: TextStyle(
-                      fontSize: fontSizeTitle,
-                      fontWeight: FontWeight.bold,
-                    ),
+                Text(
+                  " ₱${widget.posManager.totalBill.toStringAsFixed(2)}",
+                  style: TextStyle(
+                    color: Colors.red,
+                    fontSize: fontSizeValue,
+                    fontWeight: FontWeight.bold,
                   ),
-                  Text(
-                    "₱${widget.posManager.totalBill.toStringAsFixed(2)}",
-                    style: TextStyle(
-                      color: Colors.red,
-                      fontSize: fontSizeValue,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
-            const SizedBox(height: 10),
-            TextField(
+          ),
+
+          const SizedBox(height: 10),
+
+         TextField(
               controller: customerCashController,
               keyboardType: TextInputType.number,
               decoration: const InputDecoration(
@@ -369,77 +365,8 @@ class _HomeState extends State<Home> {
                 );
               },
             ),
-          ],
-        ),
-      );
-    }
-
-    // Landscape layout
-    return Row(
-      children: [
-        Expanded(
-          flex: 2,
-          child: Padding(
-            padding: EdgeInsets.all(padding),
-            child: ListView.builder(
-              itemCount: widget.posManager.rows.length,
-              itemBuilder: (_, index) => widget.posManager.buildRow(
-                widget.posManager.rows[index],
-                index,
-                onUpdate: _updateUI,
-                isAutoNextRowOn: widget.isAutoNextRowOn,
-              ),
-            ),
-          ),
-        ),
-        Expanded(
-          flex: 1,
-          child: Padding(
-            padding: EdgeInsets.all(padding),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.start,
-              children: [
-                Container(
-                  padding: EdgeInsets.all(padding),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(15),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Total Bill:',
-                        style: TextStyle(
-                          fontSize: fontSizeTitle,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      Text(
-                        "₱${widget.posManager.totalBill.toStringAsFixed(2)}",
-                        style: TextStyle(
-                          color: Colors.red,
-                          fontSize: fontSizeValue,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 20),
-                TextField(
-                  controller: customerCashController,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: "Customer Cash",
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -447,52 +374,45 @@ class _HomeState extends State<Home> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
+
       appBar: AppBar(
         automaticallyImplyLeading: false,
-        backgroundColor: Colors.white, // color nga gusto nimo
+        backgroundColor: Colors.white,
         elevation: 0,
-        centerTitle: false, // para dili center
+        centerTitle: false,
+
         title: Row(
-          mainAxisSize: MainAxisSize.min, // dili mo-occupy full width
+          mainAxisSize: MainAxisSize.min,
           children: const [
-            Icon(Icons.storefront_sharp, size: 40, color: Colors.black),
+            Icon(Icons.storefront_sharp, size: 40, color: Colors.blue),
+            SizedBox(width: 5),
             Text(
-              'Barato',
+              'Palit na! Barato pa',
               style: TextStyle(
                 color: Colors.black,
                 fontWeight: FontWeight.bold,
-                fontSize: 13,
+                fontSize: 14,
               ),
             ),
-   
           ],
         ),
+
         actions: [
           IconButton(
-            icon: const Icon(Icons.mail_outline_outlined, size:30, color: Colors.black),
+            icon: const Icon(
+              Icons.mail_outline_outlined,
+              size: 30,
+              color: Colors.black,
+            ),
             onPressed: () {
-              Navigator.pushNamed(context, "/profile").then((_) => widget.refreshUI());
+              Navigator.pushNamed(context, "/profile")
+                  .then((_) => widget.refreshUI());
             },
           ),
-          // IconButton(
-          //   icon: const Icon(Icons.refresh, color: Colors.black),
-          //   onPressed: () async {
-          //     await productService.syncOfflineProducts();
-          //     await productService.syncOnlineProducts();
-          //     await transactionService.syncOfflineTransactions();
-          //   },
-          // ),
         ],
       ),
-      body: OrientationBuilder(
-        builder: (context, orientation) {
-          return LayoutBuilder(
-            builder: (context, constraints) {
-              return _buildMainContent(orientation, constraints);
-            },
-          );
-        },
-      ),
+
+      body: _buildMainContent(),
     );
   }
 }

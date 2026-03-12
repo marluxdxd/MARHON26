@@ -107,7 +107,7 @@ print("✅ Synced to Supabase: stock_history_id=${entry['id']}, product_id=$supa
           whereArgs: [entry['id']],
         );
 
-        print('✅ Synced stock history id ${entry['id']} | product=${supaProductId}');
+        print('✅ Synced stock history id ${entry['id']} | product=$supaProductId');
       } catch (e) {
         print('❌ Failed to sync stock history id ${entry['id']}: $e');
       }

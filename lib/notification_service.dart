@@ -6,6 +6,7 @@ class NotificationsServices {
   final FlutterLocalNotificationsPlugin _flutterLocalNotificationsPlugin =
       FlutterLocalNotificationsPlugin();
 
+  /// ---------------- INITIALIZE NOTIFICATIONS ----------------
   Future<void> initialiseNotification() async {
     const AndroidInitializationSettings androidInitializationSettings =
         AndroidInitializationSettings('@mipmap/ic_launcher');
@@ -17,31 +18,64 @@ class NotificationsServices {
       initializationSettings,
       onDidReceiveNotificationResponse: (NotificationResponse response) {
         if (response.payload != null) {
-          print('Notification payload: ${response.payload}');
+          debugPrint('Notification payload: ${response.payload}');
         }
       },
     );
 
-    // Request permission for Android 13+ (API 33+)
+    /// Request permission for Android 13+
     if (defaultTargetPlatform == TargetPlatform.android) {
       await _requestAndroidNotificationPermission();
     }
   }
 
+  /// ---------------- REQUEST ANDROID PERMISSION ----------------
   Future<void> _requestAndroidNotificationPermission() async {
-    // Using permission_handler package
     final status = await Permission.notification.status;
+
     if (!status.isGranted) {
       await Permission.notification.request();
     }
   }
 
+  /// ---------------- PENDING SYNC NOTIFICATION ----------------
+  Future<void> showPendingSyncNotification() async {
+    const AndroidNotificationDetails androidDetails =
+        AndroidNotificationDetails(
+      'sync_channel',
+      'Sync Notifications',
+      channelDescription: 'Notification for pending sync transactions',
+      importance: Importance.max,
+      priority: Priority.high,
+      ongoing: true, // cannot swipe away
+      autoCancel: false,
+    );
+
+    const NotificationDetails notificationDetails =
+        NotificationDetails(android: androidDetails);
+
+    await _flutterLocalNotificationsPlugin.show(
+      99, // fixed notification ID
+      'Pending Sync',
+      'Naay pending wala pa ma sync. Turn on your WiFi to sync.',
+      notificationDetails,
+    );
+  }
+
+  /// ---------------- REMOVE PENDING NOTIFICATION ----------------
+  Future<void> cancelPendingNotification() async {
+    await _flutterLocalNotificationsPlugin.cancel(99);
+  }
+
+  /// ---------------- TEST NOTIFICATION ----------------
   Future<void> sendNotification() async {
-    const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+    const AndroidNotificationDetails androidDetails =
+        AndroidNotificationDetails(
       'test_channel',
       'Test Notifications',
+      channelDescription: 'Test notification channel',
       importance: Importance.max,
-      priority: Priority.high, 
+      priority: Priority.high,
       playSound: true,
       ticker: 'ticker',
     );

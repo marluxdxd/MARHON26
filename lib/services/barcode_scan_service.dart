@@ -38,8 +38,8 @@ class BarcodeScanService {
   static void buildBarcodeCache(List<Productclass> products) {
     _barcodeMap = {
       for (var p in products)
-        if (p.barcode != null && p.barcode!.trim().isNotEmpty)
-          p.barcode!.trim(): p,
+        if (p.barcode.trim().isNotEmpty)
+          p.barcode.trim(): p,
     };
 
     debugPrint("PRODUCTS LENGTH: ${products.length}");
@@ -52,7 +52,7 @@ class BarcodeScanService {
 
   /// ⭐ ADD THIS
   static void updateProductCache(Productclass product) {
-    final barcode = product.barcode?.trim();
+    final barcode = product.barcode.trim();
 
     if (barcode == null || barcode.isEmpty) return;
 

@@ -87,14 +87,44 @@ class LocalDatabase {
 
     final db = await openDatabase(
       path,
-      version: 1,
+      version: 2,
       onCreate: (db, version) async {
         await _createTables(db);
       },
-      onUpgrade: (db, oldVersion, newVersion) async {
-        // Migration for product_stock_history column fixes
-        if (oldVersion < 1) {}
-      },
+    onUpgrade: (db, oldVersion, newVersion) async {
+
+  if (oldVersion < 2) {
+
+    Future<bool> columnExists(String table, String column) async {
+      final result = await db.rawQuery("PRAGMA table_info($table)");
+      return result.any((col) => col['name'] == column);
+    }
+
+    if (!await columnExists('products', 'barcode')) {
+      await db.execute("ALTER TABLE products ADD COLUMN barcode TEXT");
+    }
+
+    if (!await columnExists('products', 'by_pieces')) {
+      await db.execute("ALTER TABLE products ADD COLUMN by_pieces INTEGER DEFAULT 0");
+    }
+
+    if (!await columnExists('products', 'other_qty')) {
+      await db.execute("ALTER TABLE products ADD COLUMN other_qty INTEGER DEFAULT 0");
+    }
+
+    if (!await columnExists('products', 'client_uuid')) {
+      await db.execute("ALTER TABLE products ADD COLUMN client_uuid TEXT");
+    }
+
+    if (!await columnExists('products', 'low_stock_threshold')) {
+      await db.execute("ALTER TABLE products ADD COLUMN low_stock_threshold INTEGER DEFAULT 0");
+    }
+
+  }
+
+}
+
+      
     );
 
     await db.execute('PRAGMA foreign_keys = ON');
@@ -141,7 +171,7 @@ class LocalDatabase {
       CREATE TABLE products(
         id INTEGER PRIMARY KEY,
         name TEXT NOT NULL,
-        barcode TEXT NULL,
+        barcode TEXT,
         cost_price REAL DEFAULT 0,
         retail_price REAL DEFAULT 0,
         by_pieces INTEGER DEFAULT 0,
@@ -248,6 +278,25 @@ CREATE TABLE transaction_items(
 
     return result;
   }
+
+Future<List<Map<String, dynamic>>> getPendingTransactions() async {
+  final db = await database;
+
+  return await db.query(
+    'transactions',
+    where: 'is_synced = ?',
+    whereArgs: [0],
+  );
+}
+Future<List<Map<String, dynamic>>> getLowStockProducts() async {
+  final db = await database;
+
+  return await db.query(
+    'products',
+    where: 'stock <= ?',
+    whereArgs: [5], // threshold
+  );
+}
 
   // ------------------------------ GET MONTHLY ITEMS -------------------------------- //
   Future<List<Map<String, dynamic>>> getMonthlyItems(String month) async {

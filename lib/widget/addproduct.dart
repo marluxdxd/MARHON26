@@ -82,7 +82,9 @@ class _AddProductPageState extends State<AddProductPage>
     
     final name = nameController.text.trim();
     final barcode = barcodeController.text.trim();
-    final stock = int.tryParse(stockController.text) ?? 0;
+    final stock = widget.product == null
+    ? int.tryParse(stockController.text) ?? 0
+    : widget.product!.stock;
     final lowStock = int.tryParse(lowStockController.text) ?? 0;
     final costPrice = double.tryParse(costPriceController.text) ?? 0;
     final retailPrice = double.tryParse(retailPriceController.text) ?? 0;
@@ -141,7 +143,7 @@ class _AddProductPageState extends State<AddProductPage>
             productClientUuid: widget.product!.productClientUuid,
             name: name,
             barcode: barcode,
-            stock: stock,
+             stock: widget.product!.stock,
               lowStock: lowStock,
             costPrice: costPrice,
             retailPrice: retailPrice,
@@ -384,7 +386,7 @@ class _AddProductPageState extends State<AddProductPage>
               children: [
                 AnimatedBuilder(
                   animation: _priceAnim,
-                  builder: (_, __) => Text(
+                  builder: (_, _) => Text(
                     "Price/pcs: ₱${pricePerPiece.toStringAsFixed(2)}",
                     style: const TextStyle(
                         color: Colors.blueAccent, fontWeight: FontWeight.bold),

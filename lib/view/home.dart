@@ -6,23 +6,22 @@ import 'package:cashier/services/product_service.dart';
 import 'package:cashier/services/transaction_promo_service.dart';
 import 'package:cashier/services/transaction_service.dart';
 import 'package:cashier/utils.dart';
-import 'package:cashier/widget/appdrawer.dart';
 import 'package:cashier/class/pos_row_manager.dart';
 import 'package:cashier/class/productclass.dart';
+import 'package:cashier/view/notification_page.dart';
 import 'package:cashier/widget/sukli.dart';
 import 'package:flutter/material.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:internet_connection_checker/internet_connection_checker.dart';
 import 'dart:async';
-
 import 'package:uuid/uuid.dart';
 
-// ------------------ Helper ------------------
 String generateUniqueId({String prefix = "S"}) {
   return "$prefix${DateTime.now().millisecondsSinceEpoch}";
 }
 
 class Home extends StatefulWidget {
+  
   final POSRowManager posManager;
   final List<Productclass> products;
   final bool isAutoNextRowOn;
@@ -41,11 +40,9 @@ class Home extends StatefulWidget {
 }
 
 class _HomeState extends State<Home> {
-  final NotificationsServices notificationsServices = NotificationsServices(); //testing
+  final NotificationsServices notificationsServices = NotificationsServices();
+
   late POSRowManager posManager;
-  bool isSyncingOnline = false;
-  bool isSyncing = false;
-  bool syncSuccess = false;
 
   StreamSubscription<InternetConnectionStatus>? _listener;
   StreamSubscription<ConnectivityResult>? _connectivityListener;
@@ -54,19 +51,21 @@ class _HomeState extends State<Home> {
 
   final TransactionService transactionService = TransactionService();
   final ProductService productService = ProductService();
+  
+  bool isSyncingOnline = false;
+  
+  int notificationCount = 1;
 
   @override
   void initState() {
     super.initState();
+
     posManager = widget.posManager;
 
+    notificationsServices.initialiseNotification();
 
-  // Initialize notifications - TEST
-  notificationsServices.initialiseNotification();
-
-    _listener = InternetConnectionChecker().onStatusChange.listen((
-      status,
-    ) async {
+    _listener =
+        InternetConnectionChecker().onStatusChange.listen((status) async {
       if (status == InternetConnectionStatus.connected) {
         await productService.syncOfflineProducts();
         await productService.syncOnlineProducts();
@@ -74,11 +73,8 @@ class _HomeState extends State<Home> {
       }
     });
 
-    _connectivityListener = Connectivity().onConnectivityChanged.listen((
-      status,
-    ) {
-      if (status != ConnectivityResult.none) {}
-    });
+    _connectivityListener =
+        Connectivity().onConnectivityChanged.listen((status) {});
   }
 
   void _updateUI() => setState(() {});
@@ -91,311 +87,16 @@ class _HomeState extends State<Home> {
     super.dispose();
   }
 
-  Widget _buildMainContent(
-    Orientation orientation,
-    BoxConstraints constraints,
-  ) {
-    double screenWidth = constraints.maxWidth;
-    double screenHeight = constraints.maxHeight;
-    bool isTablet = screenWidth > 600;
+  Widget _buildMainContent() {
+    double padding = 16;
+    double fontSizeTitle = 20;
+    double fontSizeValue = 20;
 
-    double padding = isTablet ? 24 : 16;
-    double fontSizeTitle = isTablet ? 28 : 20;
-    double fontSizeValue = isTablet ? 28 : 20;
-
-    if (orientation == Orientation.portrait) {
-      return Padding(
-        padding: EdgeInsets.all(padding),
-        child: Column(
-          children: [
-            Expanded(
-              child: ListView.builder(
-                itemCount: widget.posManager.rows.length,
-                itemBuilder: (_, index) => widget.posManager.buildRow(
-                  widget.posManager.rows[index],
-                  index,
-                  onUpdate: _updateUI,
-                  isAutoNextRowOn: widget.isAutoNextRowOn,
-                ),
-              ),
-            ),
-
-            ElevatedButton(
-                    onPressed: () {
-                      notificationsServices.sendNotification();
-                    },
-                    child: const Text('Send Notification'),
-                  ),
-            const SizedBox(height: 10),
-            Container(
-              padding: EdgeInsets.symmetric(
-                vertical: padding,
-                horizontal: padding,
-              ),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(15),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  
-                  Text(
-                    'Total Bill:',
-                    style: TextStyle(
-                      fontSize: fontSizeTitle,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  Text(
-                    " ₱${widget.posManager.totalBill.toStringAsFixed(2)}",
-                    style: TextStyle(
-                      color: Colors.red,
-                      fontSize: fontSizeValue,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: customerCashController,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: "Customer Cash",
-                border: OutlineInputBorder(),
-              ),
-              onSubmitted: (_) async {
-                if (isSyncingOnline) return;
-
-                final localDbPromo = LocalDbTransactionpromo();
-                final double finalTotal = widget.posManager.totalBill;
-                double cash = double.tryParse(customerCashController.text) ?? 0;
-
-                if (!transactionService.isCashSufficient(finalTotal, cash)) {
-                  print("Cash is not enough yet.");
-                  return;
-                }
-
-                setState(() => isSyncingOnline = true);
-
-                final bool online =
-                    await InternetConnectionChecker().hasConnection;
-
-                final localDb = LocalDatabase();
-                double change = transactionService.calculateChange(
-                  finalTotal,
-                  cash,
-                );
-                String timestamp = getPhilippineTimestampFormatted();
-
-                // ---------------- COMBINE SAME PRODUCTS ----------------
-                final Map<int, POSRow> combinedItems = {};
-
-                for (final row in widget.posManager.rows) {
-                  if (row.product == null) continue;
-
-                  final product = row.product!;
-                  final qty = row.isPromo ? row.otherQty : row.qty;
-
-                  if (combinedItems.containsKey(product.id)) {
-                    combinedItems[product.id]!.qty += qty;
-                  } else {
-                    combinedItems[product.id] = POSRow(
-                      product: product,
-                      qty: qty,
-                      isPromo: row.isPromo,
-                      otherQty: row.otherQty,
-                    );
-                  }
-                }
-
-                // ---------------- SAVE PROMO COUNTS PER PRODUCT ----------------
-                final Map<int, int> savedPromoCounts = Map.from(
-                  widget.posManager.promoCountByProduct,
-                );
-
-                // ---------------- SHOW UI IMMEDIATELY ----------------
-                if (mounted) {
-                  showDialog(
-                    context: context,
-                    builder: (_) => Sukli(change: change, timestamp: timestamp),
-                  );
-                  customerCashController.clear();
-                  widget.posManager.reset2();
-                  widget.posManager.reset();
-                  _updateUI();
-                }
-
-                // ---------------- PROCESS TRANSACTION IN BACKGROUND ----------------
-                unawaited(
-                  Future(() async {
-                    try {
-                      final String clientUuid = const Uuid().v4();
-
-                      final int localTransactionId = await localDb
-                          .insertTransaction(
-                            total: finalTotal,
-                            cash: cash,
-                            change: change,
-                            createdAt: timestamp,
-                            isSynced: online ? 1 : 0,
-                            clientUuid: clientUuid,
-                          );
-
-                      int? onlineTransactionId;
-
-                      if (online) {
-                        onlineTransactionId = await transactionService
-                            .saveTransaction(
-                              total: finalTotal,
-                              cash: cash,
-                              change: change,
-                              clientUuid: clientUuid,
-                            );
-
-                        await localDb.updateTransactionSupabaseId(
-                          localId: localTransactionId,
-                          supabaseId: onlineTransactionId,
-                        );
-                      }
-
-                      // ✅ TRACK PROMO INSERT PER PRODUCT.ID
-                      final Set<int> insertedPromoProducts = {};
-                      final promoService = TransactionPromoService();
-                      final futures = combinedItems.values.map((row) async {
-                        final product = row.product!;
-                        final qtySold = row.qty;
-
-                        final promoCount = savedPromoCounts[product.id] ?? 0;
-
-                        int? oldStock = await localDb.getProductStock(
-                          product.id,
-                        );
-
-                        int newStock = oldStock != null
-                            ? oldStock - qtySold
-                            : 0;
-
-                        await Future.wait([
-                          // ---------------- INSERT PROMO (ONCE PER PRODUCT) ----------------
-                          if (row.isPromo &&
-                              promoCount > 0 &&
-                              !insertedPromoProducts.contains(product.id))
-                            () async {
-                              insertedPromoProducts.add(product.id);
-
-                              print(
-                                '🔥 INSERT PROMO | tx:$localTransactionId '
-                                'product:${product.id} count:$promoCount',
-                              );
-                              // Offline insert
-                              await localDbPromo.insertTransactionPromo(
-                                transactionId: localTransactionId,
-                                productId: product.id,
-                                productName: product.name,
-                                promoCount: promoCount,
-                                retailPrice: product.retailPrice,
-                                isSynced: online ? 1 : 0,
-                              );
-                              // Online insert if connected
-                              if (online && onlineTransactionId != null) {
-                                await promoService.insertTransactionPromo(
-                                  transactionId: onlineTransactionId,
-                                  productId: product.id,
-                                  productName: product.name,
-                                  promoCount: promoCount,
-                                  retailPrice: product.retailPrice,
-                                );
-                              }
-                            }(),
-
-                          // ---------------- INSERT TRANSACTION ITEM ----------------
-                          localDb.insertTransactionItem(
-                            transactionId: localTransactionId,
-                            productId: product.id,
-                            productName: product.name,
-                            qty: qtySold,
-                            retailPrice: product.retailPrice,
-                            costPrice: product.costPrice,
-                            isPromo: product.isPromo,
-                            otherQty: product.otherQty,
-                            productClientUuid: product.productClientUuid,
-                          ),
-
-                          if (oldStock != null)
-                            localDb.updateProductStock(product.id, newStock),
-
-                          if (oldStock != null)
-                            localDb.insertStockHistory(
-                              transactionId: localTransactionId,
-                              id: generateUniqueId(prefix: "H").hashCode.abs(),
-                              productId: product.id,
-                              productName: product.name,
-                              oldStock: oldStock,
-                              qtyChanged: qtySold,
-                              newStock: newStock,
-                              type: 'SALE',
-                              createdAt: timestamp,
-                              synced: online ? 1 : 0,
-                              productClientUuid: product.productClientUuid,
-                            ),
-
-                          localDb.insertStockUpdateQueue1(
-                            productId: product.id,
-                            qty: qtySold,
-                            type: 'SALE',
-                          ),
-
-                          if (online && onlineTransactionId != null)
-                            Future.wait([
-                              productService.syncSingleProductOnline(
-                                product.id,
-                              ),
-                              transactionService.saveTransactionItem(
-                                transactionId: onlineTransactionId,
-                                product: product,
-                                qty: qtySold,
-                                isPromo: product.isPromo,
-                                otherQty: product.otherQty,
-                              ),
-                            ]),
-                        ]);
-                      }).toList();
-
-                      await Future.wait(futures);
-
-                      if (online) {
-                        await productService.syncOnlineProducts();
-                        await productService.syncOfflineStockHistory();
-                        await productService.syncOfflineProducts();
-                      }
-
-                      print("✅ TRANSACTION SUCCESS");
-                    } catch (e) {
-                      print("❌ Error saving transaction: $e");
-                    } finally {
-                      if (mounted) {
-                        setState(() => isSyncingOnline = false);
-                      }
-                    }
-                  }),
-                );
-              },
-            ),
-          ],
-        ),
-      );
-    }
-
-    // Landscape layout
-    return Row(
-      children: [
-        Expanded(
-          flex: 2,
-          child: Padding(
-            padding: EdgeInsets.all(padding),
+    return Padding(
+      padding: EdgeInsets.all(padding),
+      child: Column(
+        children: [
+          Expanded(
             child: ListView.builder(
               itemCount: widget.posManager.rows.length,
               itemBuilder: (_, index) => widget.posManager.buildRow(
@@ -406,55 +107,265 @@ class _HomeState extends State<Home> {
               ),
             ),
           ),
-        ),
-        Expanded(
-          flex: 1,
-          child: Padding(
-            padding: EdgeInsets.all(padding),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.start,
+
+          const SizedBox(height: 10),
+
+          Container(
+            padding: EdgeInsets.symmetric(
+              vertical: padding,
+              horizontal: padding,
+            ),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(15),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                Container(
-                  padding: EdgeInsets.all(padding),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(15),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Total Bill:',
-                        style: TextStyle(
-                          fontSize: fontSizeTitle,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      Text(
-                        "₱${widget.posManager.totalBill.toStringAsFixed(2)}",
-                        style: TextStyle(
-                          color: Colors.red,
-                          fontSize: fontSizeValue,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
+                Text(
+                  'Total Bill:',
+                  style: TextStyle(
+                    fontSize: fontSizeTitle,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
-                const SizedBox(height: 20),
-                TextField(
-                  controller: customerCashController,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: "Customer Cash",
-                    border: OutlineInputBorder(),
+                Text(
+                  " ₱${widget.posManager.totalBill.toStringAsFixed(2)}",
+                  style: TextStyle(
+                    color: Colors.red,
+                    fontSize: fontSizeValue,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
               ],
             ),
           ),
-        ),
-      ],
+
+          const SizedBox(height: 10),
+
+         TextField(
+  controller: customerCashController,
+  keyboardType: TextInputType.number,
+  decoration: const InputDecoration(
+    labelText: "Customer Cash",
+    border: OutlineInputBorder(),
+  ),
+  onSubmitted: (_) async {
+    if (isSyncingOnline) return;
+
+    final localDbPromo = LocalDbTransactionpromo();
+    final localDb = LocalDatabase();
+    final notification = NotificationsServices();
+
+    final double finalTotal = widget.posManager.totalBill;
+    double cash = double.tryParse(customerCashController.text) ?? 0;
+
+    if (!transactionService.isCashSufficient(finalTotal, cash)) {
+      print("Cash is not enough yet.");
+      return;
+    }
+
+    setState(() => isSyncingOnline = true);
+
+    final bool online =
+        await InternetConnectionChecker().hasConnection;
+
+    /// SHOW PENDING SYNC NOTIFICATION IF OFFLINE
+    if (!online) {
+      await notification.showPendingSyncNotification();
+    }
+
+    double change = transactionService.calculateChange(finalTotal, cash);
+    String timestamp = getPhilippineTimestampFormatted();
+
+    /// COMBINE SAME PRODUCTS
+    final Map<int, POSRow> combinedItems = {};
+
+    for (final row in widget.posManager.rows) {
+      if (row.product == null) continue;
+
+      final product = row.product!;
+      final qty = row.isPromo ? row.otherQty : row.qty;
+
+      if (combinedItems.containsKey(product.id)) {
+        combinedItems[product.id]!.qty += qty;
+      } else {
+        combinedItems[product.id] = POSRow(
+          product: product,
+          qty: qty,
+          isPromo: row.isPromo,
+          otherQty: row.otherQty,
+        );
+      }
+    }
+
+    /// SAVE PROMO COUNTS
+    final Map<int, int> savedPromoCounts =
+        Map.from(widget.posManager.promoCountByProduct);
+
+    /// SHOW CHANGE UI IMMEDIATELY
+    if (mounted) {
+      showDialog(
+        context: context,
+        builder: (_) => Sukli(change: change, timestamp: timestamp),
+      );
+
+      customerCashController.clear();
+      widget.posManager.reset2();
+      widget.posManager.reset();
+      _updateUI();
+    }
+
+    /// PROCESS TRANSACTION IN BACKGROUND
+    unawaited(
+      Future(() async {
+        try {
+          final String clientUuid = const Uuid().v4();
+
+          final int localTransactionId = await localDb.insertTransaction(
+            total: finalTotal,
+            cash: cash,
+            change: change,
+            createdAt: timestamp,
+            isSynced: online ? 1 : 0,
+            clientUuid: clientUuid,
+          );
+
+          int? onlineTransactionId;
+
+          if (online) {
+            onlineTransactionId = await transactionService.saveTransaction(
+              total: finalTotal,
+              cash: cash,
+              change: change,
+              clientUuid: clientUuid,
+            );
+
+            await localDb.updateTransactionSupabaseId(
+              localId: localTransactionId,
+              supabaseId: onlineTransactionId,
+            );
+          }
+
+          final Set<int> insertedPromoProducts = {};
+          final promoService = TransactionPromoService();
+
+          final futures = combinedItems.values.map((row) async {
+            final product = row.product!;
+            final qtySold = row.qty;
+            final promoCount = savedPromoCounts[product.id] ?? 0;
+
+            int? oldStock = await localDb.getProductStock(product.id);
+
+            int newStock = oldStock != null
+                ? oldStock - qtySold
+                : 0;
+
+            await Future.wait([
+
+              /// INSERT PROMO
+              if (row.isPromo &&
+                  promoCount > 0 &&
+                  !insertedPromoProducts.contains(product.id))
+                () async {
+                  insertedPromoProducts.add(product.id);
+
+                  await localDbPromo.insertTransactionPromo(
+                    transactionId: localTransactionId,
+                    productId: product.id,
+                    productName: product.name,
+                    promoCount: promoCount,
+                    retailPrice: product.retailPrice,
+                    isSynced: online ? 1 : 0,
+                  );
+
+                  if (online && onlineTransactionId != null) {
+                    await promoService.insertTransactionPromo(
+                      transactionId: onlineTransactionId,
+                      productId: product.id,
+                      productName: product.name,
+                      promoCount: promoCount,
+                      retailPrice: product.retailPrice,
+                    );
+                  }
+                }(),
+
+              /// INSERT ITEM
+              localDb.insertTransactionItem(
+                transactionId: localTransactionId,
+                productId: product.id,
+                productName: product.name,
+                qty: qtySold,
+                retailPrice: product.retailPrice,
+                costPrice: product.costPrice,
+                isPromo: product.isPromo,
+                otherQty: product.otherQty,
+                productClientUuid: product.productClientUuid,
+              ),
+
+              if (oldStock != null)
+                localDb.updateProductStock(product.id, newStock),
+
+              if (oldStock != null)
+                localDb.insertStockHistory(
+                  transactionId: localTransactionId,
+                  id: generateUniqueId(prefix: "H").hashCode.abs(),
+                  productId: product.id,
+                  productName: product.name,
+                  oldStock: oldStock,
+                  qtyChanged: qtySold,
+                  newStock: newStock,
+                  type: 'SALE',
+                  createdAt: timestamp,
+                  synced: online ? 1 : 0,
+                  productClientUuid: product.productClientUuid,
+                ),
+
+              localDb.insertStockUpdateQueue1(
+                productId: product.id,
+                qty: qtySold,
+                type: 'SALE',
+              ),
+
+              if (online && onlineTransactionId != null)
+                Future.wait([
+                  productService.syncSingleProductOnline(product.id),
+                  transactionService.saveTransactionItem(
+                    transactionId: onlineTransactionId,
+                    product: product,
+                    qty: qtySold,
+                    isPromo: product.isPromo,
+                    otherQty: product.otherQty,
+                  ),
+                ]),
+            ]);
+          }).toList();
+
+          await Future.wait(futures);
+
+          if (online) {
+            await productService.syncOnlineProducts();
+            await productService.syncOfflineStockHistory();
+            await productService.syncOfflineProducts();
+
+            /// REMOVE PENDING SYNC NOTIFICATION
+            await notification.cancelPendingNotification();
+          }
+
+          print("✅ TRANSACTION SUCCESS");
+        } catch (e) {
+          print("❌ Error saving transaction: $e");
+        } finally {
+          if (mounted) {
+            setState(() => isSyncingOnline = false);
+          }
+        }
+      }),
+    );
+  },
+)
+        ],
+      ),
     );
   }
 
@@ -462,15 +373,18 @@ class _HomeState extends State<Home> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
+
       appBar: AppBar(
         automaticallyImplyLeading: false,
-        backgroundColor: Colors.white, // color nga gusto nimo
+        backgroundColor: Colors.white,
         elevation: 0,
-        centerTitle: false, // para dili center
+        centerTitle: false,
+
         title: Row(
-          mainAxisSize: MainAxisSize.min, // dili mo-occupy full width
+          mainAxisSize: MainAxisSize.min,
           children: const [
             Icon(Icons.storefront_sharp, size: 40, color: Colors.blue),
+            SizedBox(width: 5),
             Text(
               'Palit na! Barato pa',
               style: TextStyle(
@@ -481,39 +395,52 @@ class _HomeState extends State<Home> {
             ),
           ],
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(
-              Icons.mail_outline_outlined,
-              size: 30,
-              color: Colors.black,
-            ),
-            onPressed: () {
-              Navigator.pushNamed(
-                context,
-                "/profile",
-              ).then((_) => widget.refreshUI());
-            },
+
+     actions: [
+          Stack(
+            children: [
+              IconButton(
+                icon: const Icon(
+                  Icons.mail_outline_outlined,
+                  size: 30,
+                  color: Colors.black,
+                ),
+                onPressed: () async {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const NotificationsPage(),
+                    ),
+                  );
+                },
+              ),
+
+              /// BADGE
+              if (notificationCount > 0)
+                Positioned(
+                  right: 8,
+                  top: 8,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(
+                      color: Colors.red,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Text(
+                      notificationCount.toString(),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
           ),
-          // IconButton(
-          //   icon: const Icon(Icons.refresh, color: Colors.black),
-          //   onPressed: () async {
-          //     await productService.syncOfflineProducts();
-          //     await productService.syncOnlineProducts();
-          //     await transactionService.syncOfflineTransactions();
-          //   },
-          // ),
         ],
       ),
-      body: OrientationBuilder(
-        builder: (context, orientation) {
-          return LayoutBuilder(
-            builder: (context, constraints) {
-              return _buildMainContent(orientation, constraints);
-            },
-          );
-        },
-      ),
+
+      body: _buildMainContent(),
     );
   }
 }
