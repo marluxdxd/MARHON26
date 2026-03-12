@@ -3,6 +3,7 @@ import 'package:cashier/database/local_db.dart';
 import 'package:cashier/database/local_db_transactionpromo.dart';
 import 'package:cashier/notification_service.dart';
 import 'package:cashier/services/product_service.dart';
+import 'package:cashier/services/stock_history_sync.dart';
 import 'package:cashier/services/transaction_promo_service.dart';
 import 'package:cashier/services/transaction_service.dart';
 import 'package:cashier/utils.dart';
@@ -51,10 +52,13 @@ class _HomeState extends State<Home> {
 
   final TransactionService transactionService = TransactionService();
   final ProductService productService = ProductService();
+  final StockHistorySyncService stockHistorySyncService = StockHistorySyncService();
   
   bool isSyncingOnline = false;
   
   int notificationCount = 1;
+  
+ 
 
   @override
   void initState() {
@@ -70,6 +74,8 @@ class _HomeState extends State<Home> {
         await productService.syncOfflineProducts();
         await productService.syncOnlineProducts();
         await transactionService.syncOfflineTransactions();
+         // 2️⃣ Sync offline stock history
+    await stockHistorySyncService.syncStockHistory();
       }
     });
 
@@ -307,6 +313,7 @@ class _HomeState extends State<Home> {
                 localDb.updateProductStock(product.id, newStock),
 
               if (oldStock != null)
+              
                 localDb.insertStockHistory(
                   transactionId: localTransactionId,
                   id: generateUniqueId(prefix: "H").hashCode.abs(),
@@ -319,7 +326,9 @@ class _HomeState extends State<Home> {
                   createdAt: timestamp,
                   synced: online ? 1 : 0,
                   productClientUuid: product.productClientUuid,
+                  
                 ),
+                
 
               localDb.insertStockUpdateQueue1(
                 productId: product.id,

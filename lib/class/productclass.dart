@@ -25,11 +25,9 @@ class Productclass {
     required this.productClientUuid, // ✅ REQUIRED
     this.isPromo = false, // default false
     this.otherQty = 0, // default 0
-    this.type = 'add', 
-   this.lowStock = 0, // default 0
+    this.type = 'add',
+    this.lowStock = 0, // default 0
   });
-
-  
 
   // Convert to Map for Supabase insert/update
   Map<String, dynamic> toMap() {
@@ -40,7 +38,7 @@ class Productclass {
       'retail_price': retailPrice,
       'cost_price': costPrice,
       'stock': stock,
-       'by_pieces': byPieces,
+      'by_pieces': byPieces,
       'is_promo': isPromo,
       'other_qty': otherQty,
       'client_uuid': productClientUuid,
@@ -50,24 +48,22 @@ class Productclass {
   }
 
   // Convert Supabase row → Productclass
- factory Productclass.fromMap(Map<String, dynamic> map) {
-  return Productclass(
-    id: map['id'],
-    name: map['name'],
-    barcode: map['barcode'] ?? '',
-    retailPrice: double.tryParse(map['retail_price'].toString()) ?? 0,
-    costPrice: double.tryParse(map['cost_price'].toString()) ?? 0,
-    stock: map['stock'],
-    isPromo: map['is_promo'] == true || map['is_promo'] == 1,
-    otherQty: map['other_qty'] ?? 0,
-    productClientUuid: map['client_uuid'] as String,
-    type: map['type'] ?? 'add',
-    byPieces: int.tryParse(map['by_pieces'].toString()) ?? 0,
-    lowStock: map['low_stock_threshold'] ?? 0, // ✅ Add low stock threshold
-  );
-}
-
-  
+  factory Productclass.fromMap(Map<String, dynamic> map) {
+    return Productclass(
+      id: map['id'],
+      name: map['name'],
+      barcode: map['barcode'] ?? '',
+      retailPrice: double.tryParse(map['retail_price'].toString()) ?? 0,
+      costPrice: double.tryParse(map['cost_price'].toString()) ?? 0,
+      stock: map['stock'],
+      isPromo: map['is_promo'] == true || map['is_promo'] == 1,
+      otherQty: map['other_qty'] ?? 0,
+      productClientUuid: map['client_uuid'] as String,
+      type: map['type'] ?? 'add',
+      byPieces: int.tryParse(map['by_pieces'].toString()) ?? 0,
+      lowStock: map['low_stock_threshold'] ?? 0, // ✅ Add low stock threshold
+    );
+  }
 
   // Fetch all products from Supabase
   static Future<List<Productclass>> fetchProducts() async {

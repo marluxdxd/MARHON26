@@ -24,7 +24,9 @@ class StockHistorySyncService {
     }
 
     for (final entry in unsyncedHistory) {
-      print("🔍 Processing stock history id=${entry['id']}, product_id=${entry['product_id']}, qty_changed=${entry['qty_changed']}, client_uuid=${entry['product_client_uuid']}");
+      print("🔍 Processing stock history id=${entry['id']}, "
+          "product_id=${entry['product_id']}, qty_changed=${entry['qty_changed']}, "
+          "client_uuid=${entry['product_client_uuid']}");
 
       try {
         // 2️⃣ Ensure product_client_uuid exists
@@ -37,6 +39,7 @@ class StockHistorySyncService {
             where: 'id = ?',
             whereArgs: [entry['id']],
           );
+          print("🆕 Generated missing product_client_uuid for stock history id ${entry['id']}");
         }
 
         // 3️⃣ Get local product using client_uuid
@@ -52,6 +55,7 @@ class StockHistorySyncService {
         }
 
         final product = productList.first;
+        final productName = product['name']?.toString() ?? 'UNKNOWN';
 
         // 4️⃣ Ensure product exists in Supabase
         final supaProduct = await supabase
@@ -67,7 +71,7 @@ class StockHistorySyncService {
           final inserted = await supabase
               .from('products')
               .insert({
-                'name': product['name'] ?? 'UNKNOWN',
+                'name': productName,
                 'cost_price': product['cost_price'] ?? 0.0,
                 'retail_price': product['retail_price'] ?? 0.0,
                 'stock': product['stock'] ?? 0,
@@ -79,25 +83,23 @@ class StockHistorySyncService {
               .single();
 
           supaProductId = inserted['id'] as int;
-          print('➕ Inserted missing product "${product['name']}" to Supabase');
+          print('➕ Inserted missing product "$productName" to Supabase');
         }
 
         // 5️⃣ Insert stock history into Supabase
-   await supabase.from('product_stock_history').insert({
-  'product_id': supaProductId,
-  'product_name': entry['product_name'] ?? product['name'] ?? 'UNKNOWN',
-  'old_stock': entry['old_stock'] ?? 0,
-  'new_stock': entry['new_stock'] ?? 0,
-  'qty_changed': entry['qty_changed'] ?? 0,
-  'change_type': entry['change_type']?.toString() ?? 'sale',
-  'trans_date': entry['trans_date']?.toString() ?? DateTime.now().toIso8601String(),
-  'created_at': entry['created_at']?.toString() ?? DateTime.now().toIso8601String(),
-  'product_client_uuid': clientUuid,
-});
-print("✅ Synced to Supabase: stock_history_id=${entry['id']}, product_id=$supaProductId, qty_changed=${entry['qty_changed']}");
+        await supabase.from('product_stock_history').insert({
+          'product_id': supaProductId,
+          'product_name': entry['product_name'] ?? productName,
+          'old_stock': entry['old_stock'] ?? 0,
+          'new_stock': entry['new_stock'] ?? 0,
+          'qty_changed': entry['qty_changed'] ?? 0,
+          'change_type': entry['change_type']?.toString() ?? 'sale',
+          'trans_date': entry['trans_date']?.toString() ?? DateTime.now().toIso8601String(),
+          'created_at': entry['created_at']?.toString() ?? DateTime.now().toIso8601String(),
+          'product_client_uuid': clientUuid,
+        });
 
-        
-
+        print("✅ Synced to Supabase: stock_history_id=${entry['id']}, product_id=$supaProductId, qty_changed=${entry['qty_changed']}");
 
         // 6️⃣ Mark as synced locally
         await db.update(
