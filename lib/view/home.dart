@@ -3,6 +3,7 @@ import 'package:cashier/background_callback.dart';
 import 'package:cashier/class/posrowclass.dart';
 import 'package:cashier/database/local_db.dart';
 import 'package:cashier/database/local_db_transactionpromo.dart';
+import 'package:cashier/icon-animate/animated_notification_icon.dart';
 import 'package:cashier/main.dart';
 import 'package:cashier/notification_service.dart';
 import 'package:cashier/services/product_service.dart';
@@ -16,6 +17,7 @@ import 'package:cashier/view/notification_page.dart';
 import 'package:cashier/widget/sukli.dart';
 import 'package:flutter/material.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:flutter_svg/svg.dart';
 import 'package:internet_connection_checker/internet_connection_checker.dart';
 import 'dart:async';
 import 'package:uuid/uuid.dart';
@@ -79,13 +81,13 @@ class _HomeState extends State<Home> {
   void initState() {
     super.initState();
     // Schedule background alarm
-    AndroidAlarmManager.periodic(
-      const Duration(minutes: 1),
-      0, // unique ID for this alarm
-      periodicNotificationCallback,
-      wakeup: true, // wakes device if asleep
-      exact: true,
-    );
+    // AndroidAlarmManager.periodic(
+    //   const Duration(minutes: 1),
+    //   0, // unique ID for this alarm
+    //   periodicNotificationCallback,
+    //   wakeup: true, // wakes device if asleep
+    //   exact: true,
+    // );
     posManager = widget.posManager;
 
     // Initialize notifications
@@ -425,31 +427,24 @@ class _HomeState extends State<Home> {
         elevation: 0,
         centerTitle: false,
 
-        title: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: const [
-            Icon(Icons.storefront_sharp, size: 40, color: Colors.blue),
-            SizedBox(width: 5),
-            Text(
-              'Palit na! Barato pa',
-              style: TextStyle(
-                color: Colors.black,
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
-              ),
-            ),
-          ],
-        ),
+        title:   Row(
+    mainAxisSize: MainAxisSize.min, // dili mo-occupy full width
+     children: [
+      SvgPicture.asset(
+        'assets/icons/mh.svg', 
+        width: 50,
+        height: 50,
+      
+      ),
+      
+      ],
+  ),
 
         actions: [
           Stack(
             children: [
-              IconButton(
-                icon: const Icon(
-                  Icons.mail_outline_outlined,
-                  size: 30,
-                  color: Colors.black,
-                ),
+              AnimatedNotificationIcon(
+                notificationCount: notificationCount,
                 onPressed: () async {
                   await Navigator.push(
                     context,
@@ -460,24 +455,6 @@ class _HomeState extends State<Home> {
                   loadNotificationCount();
                 },
               ),
-
-              /// BADGE
-              if (notificationCount > 0)
-                Positioned(
-                  right: 8,
-                  top: 8,
-                  child: Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: const BoxDecoration(
-                      color: Colors.red,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Text(
-                      notificationCount.toString(),
-                      style: const TextStyle(color: Colors.white, fontSize: 10),
-                    ),
-                  ),
-                ),
             ],
           ),
         ],

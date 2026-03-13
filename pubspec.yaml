@@ -61,6 +61,7 @@ dependencies:
   flutter_local_notifications: ^17.0.0
   android_alarm_manager_plus: ^5.0.0
   workmanager: ^0.9.0+3
+  flutter_launcher_icons: ^0.14.4
 
 
 
@@ -79,7 +80,12 @@ dev_dependencies:
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
-
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/icons/mh.png"
+  adaptive_icon_foreground: "assets/icons/foreground.png"
+  adaptive_icon_background: "assets/icons/background.png"
 # The following section is specific to Flutter packages.
 flutter:
   # The following line ensures that the Material Icons font is

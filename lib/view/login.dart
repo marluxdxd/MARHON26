@@ -1,8 +1,8 @@
-
 import 'package:cashier/utils/preferences.dart';
 import 'package:cashier/view/master.dart';
 import 'package:cashier/widget/main_navigation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/svg.dart';
 
 class LoginScreen extends StatelessWidget {
   const LoginScreen({super.key});
@@ -15,51 +15,81 @@ class LoginScreen extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Row(
-    mainAxisSize: MainAxisSize.min, // dili mo-occupy full width
-    children: const [
-     
-      Icon(
-        Icons.storefront_sharp,
-        size: 30,
-        color: Colors.black,
-      ),
-       Text(
-        'Palit Na Barato Ra',
-        style: TextStyle(
-          color: Colors.black,
-          fontWeight: FontWeight.bold,
-          fontSize: 13,
-        ),
-      ),
-    ],
-  ),
+            Column(
+              mainAxisSize: MainAxisSize.min, // dili mo-occupy full width
+              children: [
+                SvgPicture.asset(
+                  'assets/icons/mh.svg',
+                  width: 100,
+                  height: 100,
+                ),
+              ],
+            ),
 
             const Text(
               "Select Login Type",
-              style: TextStyle(
-                fontSize: 26,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
             ),
 
             const SizedBox(height: 40),
+             //-------------------------------------------
+            //-----------------LOGIN------------------------
+            GestureDetector(
+              onTap: () async {
+                await Preferences.saveLoginRole("guest");
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const MainNav(role: "guest"),
+                  ),
+                );
+              },
+              child: Container(
+                width: 150,
+                height: 150,
+                decoration: BoxDecoration(
+                  color: Colors.orange.shade100,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.grey.shade400,
+                      blurRadius: 10,
+                      offset: const Offset(3, 5),
+                    ),
+                  ],
+                ),
+                child: const Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.person_outline, size: 40),
+                    SizedBox(height: 8),
+                    Text(
+                      "Login",
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
 
+            //-------------------------------------------
+            //-----------------------------------------
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-
                 /// GUEST BUTTON
                 GestureDetector(
                   onTap: () async {
-await Preferences.saveLoginRole("guest");
+                    await Preferences.saveLoginRole("guest");
                     Navigator.pushReplacement(
                       context,
                       MaterialPageRoute(
                         builder: (_) => const MainNav(role: "guest"),
                       ),
                     );
-
                   },
                   child: Container(
                     width: 150,
@@ -72,7 +102,7 @@ await Preferences.saveLoginRole("guest");
                           color: Colors.grey.shade400,
                           blurRadius: 10,
                           offset: const Offset(3, 5),
-                        )
+                        ),
                       ],
                     ),
                     child: const Column(
@@ -86,7 +116,7 @@ await Preferences.saveLoginRole("guest");
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
                           ),
-                        )
+                        ),
                       ],
                     ),
                   ),
@@ -97,14 +127,12 @@ await Preferences.saveLoginRole("guest");
                 /// MASTER BUTTON
                 GestureDetector(
                   onTap: () {
-
                     Navigator.push(
                       context,
                       MaterialPageRoute(
                         builder: (_) => const MasterLoginScreen(),
                       ),
                     );
-
                   },
                   child: Container(
                     width: 150,
@@ -117,7 +145,7 @@ await Preferences.saveLoginRole("guest");
                           color: Colors.grey.shade400,
                           blurRadius: 10,
                           offset: const Offset(3, 5),
-                        )
+                        ),
                       ],
                     ),
                     child: const Column(
@@ -131,7 +159,7 @@ await Preferences.saveLoginRole("guest");
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
                           ),
-                        )
+                        ),
                       ],
                     ),
                   ),

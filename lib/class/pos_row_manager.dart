@@ -274,10 +274,7 @@ Future<void> handleScannedBarcode(
   }) {
     double displayPrice = 0;
 
-print("BUILD ROW PRODUCT: ${row.product?.name}");
-print("BUILD ROW PRICE: ${row.product?.retailPrice}");
-print("QTY: ${row.qty}");
-print("PROMO COUNT: ${row.promo_count}");
+
 
     if (row.product != null) {
       displayPrice = row.isPromo

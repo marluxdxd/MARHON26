@@ -276,6 +276,7 @@ CREATE TABLE transaction_items(
 
     return result;
   }
+  
 
 Future<List<Map<String, dynamic>>> getPendingTransactions() async {
   final db = await database;

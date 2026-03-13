@@ -26,13 +26,13 @@ void main() async {
   // Initialize Android Alarm Manager
   await AndroidAlarmManager.initialize();
 
-  AndroidAlarmManager.periodic(
-      const Duration(minutes: 1),
-      0, // unique ID for this alarm
-      periodicNotificationCallback,
-      wakeup: true, // wakes device if asleep
-      exact: true,
-    );
+  // AndroidAlarmManager.periodic(
+  //     const Duration(minutes: 1),
+  //     0, // unique ID for this alarm
+  //     periodicNotificationCallback,
+  //     wakeup: true, // wakes device if asleep
+  //     exact: true,
+  //   );
 
   // Initialize services
   final productService = ProductService();
@@ -49,10 +49,10 @@ void main() async {
     transactionPromoService: transactionPromoService,
   );
 
-  // Schedule background notifications every 1 minute for testing
+  // Schedule background ni kung minimize ang app or gi close ang app
   await AndroidAlarmManager.periodic(
-    const Duration(minutes: 1),
-    0, // unique alarm ID
+    const Duration(minutes: 30),
+    5, // unique alarm ID
     periodicNotificationCallback,
     wakeup: true,
     exact: true,

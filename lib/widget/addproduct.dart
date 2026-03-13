@@ -370,7 +370,7 @@ debugLowStock();
                 child: TextField(
                   controller: lowStockController,
                   keyboardType: TextInputType.number,
-                  style: const TextStyle(color: Colors.black54),
+                  style: const TextStyle(color: Colors.black),
                   decoration: buildInputDecoration("Low Stock", Icons.warning)
                       .copyWith(hintText: "Optional"),
                 ),

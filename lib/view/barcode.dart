@@ -267,7 +267,7 @@ class _BarcodeScannerPageState extends State<BarcodeScannerPage> {
             left: 0,
             right: 0,
             child: Container(
-              height: 400,
+              height: 300,
               decoration: const BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
