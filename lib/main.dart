@@ -1,54 +1,72 @@
-import 'package:cashier/services/connectivity_service.dart';
-import 'package:cashier/services/product_service.dart';
-import 'package:cashier/services/stock_history_sync.dart';
-import 'package:cashier/services/transaction_promo_service.dart';
-import 'package:cashier/services/transaction_service.dart';
-import 'package:cashier/services/transactionitem_service.dart';
-import 'package:cashier/utils/preferences.dart';
+import 'package:flutter/material.dart';
+
+import 'package:android_alarm_manager_plus/android_alarm_manager_plus.dart';
 import 'package:cashier/view/login.dart';
 import 'package:cashier/widget/main_navigation.dart';
-import 'package:cashier/view/home.dart';
-import 'package:flutter/material.dart';
-import 'package:cashier/database/supabase.dart';
+import 'package:cashier/utils/preferences.dart';
 import 'package:cashier/database/local_db.dart';
+import 'package:cashier/database/supabase.dart';
+import 'package:cashier/services/connectivity_service.dart';
+import 'package:cashier/services/product_service.dart';
+import 'package:cashier/services/transaction_service.dart';
+import 'package:cashier/services/transactionitem_service.dart';
+import 'package:cashier/services/stock_history_sync.dart';
+import 'package:cashier/services/transaction_promo_service.dart';
+import 'package:cashier/background_callback.dart';
 
+
+@pragma('vm:entry-point')
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Initialize Supabase and local DB
   await SupabaseConfig.initialize();
   await LocalDatabase().database;
-  final localDb = LocalDatabase();
 
-  // Print all local transactions (optional)
-  await localDb.printAllTransactions();
-  await localDb.printAllTransactionItems();
+  // Initialize Android Alarm Manager
+  await AndroidAlarmManager.initialize();
+
+  AndroidAlarmManager.periodic(
+      const Duration(minutes: 1),
+      0, // unique ID for this alarm
+      periodicNotificationCallback,
+      wakeup: true, // wakes device if asleep
+      exact: true,
+    );
 
   // Initialize services
   final productService = ProductService();
   final transactionService = TransactionService();
   final transactionItemService = TransactionItemService();
-  final stockHistoryService = StockHistorySyncService();
+  final stockHistorySyncService = StockHistorySyncService();
   final transactionPromoService = TransactionPromoService();
 
-  // Initialize connectivity listener
   ConnectivityService(
     productService: productService,
     transactionService: transactionService,
     transactionItemService: transactionItemService,
-    stockHistorySyncService: stockHistoryService,
+    stockHistorySyncService: stockHistorySyncService,
     transactionPromoService: transactionPromoService,
   );
 
-  // **CHECK SAVED LOGIN ROLE**
+  // Schedule background notifications every 1 minute for testing
+  await AndroidAlarmManager.periodic(
+    const Duration(minutes: 1),
+    0, // unique alarm ID
+    periodicNotificationCallback,
+    wakeup: true,
+    exact: true,
+    rescheduleOnReboot: true,
+  );
+
+  // Check saved login role
   String? savedRole = await Preferences.getLoginRole();
 
-  // Run app with initial role
   runApp(MyApp(initialRole: savedRole));
 }
 
 class MyApp extends StatelessWidget {
-  final String? initialRole; // Accept saved role
+  final String? initialRole;
   const MyApp({super.key, this.initialRole});
 
   @override
@@ -59,7 +77,6 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
       ),
-      // If there's a saved role, go directly to MainNav. Otherwise, show LoginScreen
       home: initialRole != null
           ? MainNav(role: initialRole!)
           : const LoginScreen(),

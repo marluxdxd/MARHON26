@@ -81,55 +81,53 @@ class LocalDatabase {
   }
 
   // ------------------------- DATABASE INITIALIZATION ----------------- //
-  Future<Database> _initDB() async {
-    final dbPath = await getDatabasesPath();
-    final path = join(dbPath, 'app.db');
+ Future<Database> _initDB() async {
+  final dbPath = await getDatabasesPath();
+  final path = join(dbPath, 'app1.db');
 
-    final db = await openDatabase(
-      path,
-      version: 2,
-      onCreate: (db, version) async {
-        await _createTables(db);
-      },
+  final db = await openDatabase(
+    path,
+    version: 2,
+    onCreate: (db, version) async {
+      await _createTables(db);
+    },
     onUpgrade: (db, oldVersion, newVersion) async {
+      if (oldVersion < 2) {
+        // Helper function to check if column exists
+        Future<bool> columnExists(String table, String column) async {
+          final result = await db.rawQuery("PRAGMA table_info($table)");
+          return result.any((col) => col['name'] == column);
+        }
 
-  if (oldVersion < 2) {
+        if (!await columnExists('products', 'barcode')) {
+          await db.execute("ALTER TABLE products ADD COLUMN barcode TEXT");
+        }
 
-    Future<bool> columnExists(String table, String column) async {
-      final result = await db.rawQuery("PRAGMA table_info($table)");
-      return result.any((col) => col['name'] == column);
-    }
+        if (!await columnExists('products', 'by_pieces')) {
+          await db.execute("ALTER TABLE products ADD COLUMN by_pieces INTEGER DEFAULT 0");
+        }
 
-    if (!await columnExists('products', 'barcode')) {
-      await db.execute("ALTER TABLE products ADD COLUMN barcode TEXT");
-    }
+        if (!await columnExists('products', 'other_qty')) {
+          await db.execute("ALTER TABLE products ADD COLUMN other_qty INTEGER DEFAULT 0");
+        }
 
-    if (!await columnExists('products', 'by_pieces')) {
-      await db.execute("ALTER TABLE products ADD COLUMN by_pieces INTEGER DEFAULT 0");
-    }
+        if (!await columnExists('products', 'client_uuid')) {
+          await db.execute("ALTER TABLE products ADD COLUMN client_uuid TEXT");
+        }
 
-    if (!await columnExists('products', 'other_qty')) {
-      await db.execute("ALTER TABLE products ADD COLUMN other_qty INTEGER DEFAULT 0");
-    }
+        // ✅ Corrected: add low_stock_threshold with DEFAULT 0
+        if (!await columnExists('products', 'low_stock_threshold')) {
+          await db.execute(
+            "ALTER TABLE products ADD COLUMN low_stock_threshold INTEGER NULL"
+          );
+        }
+      }
+    },
+  );
 
-    if (!await columnExists('products', 'client_uuid')) {
-      await db.execute("ALTER TABLE products ADD COLUMN client_uuid TEXT");
-    }
-
-    if (!await columnExists('products', 'low_stock_threshold')) {
-      await db.execute("ALTER TABLE products ADD COLUMN low_stock_threshold INTEGER DEFAULT 0");
-    }
-
-  }
-
+  await db.execute('PRAGMA foreign_keys = ON');
+  return db;
 }
-
-      
-    );
-
-    await db.execute('PRAGMA foreign_keys = ON');
-    return db;
-  }
 
   Future<void> _createTables(Database db) async {
     // Products table
@@ -176,7 +174,7 @@ class LocalDatabase {
         retail_price REAL DEFAULT 0,
         by_pieces INTEGER DEFAULT 0,
         stock INTEGER NOT NULL,
-        low_stock_threshold INTEGER DEFAULT 0,
+        low_stock_threshold NOT NULL,
         is_promo INTEGER DEFAULT 0,
         other_qty INTEGER DEFAULT 0,
         is_synced INTEGER DEFAULT 0,
@@ -293,11 +291,17 @@ Future<List<Map<String, dynamic>>> getLowStockProducts() async {
 
   return await db.query(
     'products',
-    where: 'stock <= ?',
-    whereArgs: [5], // threshold
+    where: 'low_stock_threshold IS NOT NULL AND stock <= low_stock_threshold',
   );
 }
+Future<List<Map<String, dynamic>>> getProductsWithoutBarcode() async {
+  final db = await database;
 
+  return await db.query(
+    'products',
+    where: 'barcode IS NULL OR barcode = ""',
+  );
+}
   // ------------------------------ GET MONTHLY ITEMS -------------------------------- //
   Future<List<Map<String, dynamic>>> getMonthlyItems(String month) async {
     final db = await database;

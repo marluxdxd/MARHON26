@@ -36,10 +36,38 @@ class _AddProductPageState extends State<AddProductPage>
   late AnimationController _animController;
   late Animation<double> _priceAnim;
 
+
+Future<void> debugLowStock() async {
+  final db = await productService.localDb.database;
+
+  final result = await db.rawQuery('''
+    SELECT *
+    FROM products
+    WHERE low_stock_threshold = 0
+  ''');
+
+  print("LOW STOCK = 0 PRODUCTS:");
+  print(result);
+}
+
+Future<void> debugProducts() async {
+  final db = await productService.localDb.database;
+
+  final result = await db.rawQuery(
+      'SELECT id, name, stock, low_stock_threshold FROM products');
+
+  print("📦 PRODUCTS TABLE:");
+  for (var row in result) {
+    print(row);
+  }
+}
+
+
+
   @override
   void initState() {
     super.initState();
-
+debugLowStock();
     _animController =
         AnimationController(vsync: this, duration: const Duration(milliseconds: 400));
     _priceAnim = Tween<double>(begin: 0, end: 0).animate(_animController);
@@ -60,6 +88,7 @@ class _AddProductPageState extends State<AddProductPage>
       retailPriceController.text = p.retailPrice.toString();
       byPiecesController.text = p.byPieces.toString();
       promoQtyController.text = p.otherQty.toString();
+      lowStockController.text = p.lowStock.toString();
       isPromo = p.isPromo;
 
       WidgetsBinding.instance.addPostFrameCallback((_) {

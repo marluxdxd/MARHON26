@@ -12,7 +12,7 @@ class Productclass {
   final int otherQty;
   final String type; // 'add', 'update', 'delete' for sync
   final String productClientUuid;
-  int lowStock;
+  final int lowStock;
 
   Productclass({
     required this.id,

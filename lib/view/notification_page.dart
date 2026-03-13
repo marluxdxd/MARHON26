@@ -1,6 +1,6 @@
 import 'package:cashier/database/local_db.dart';
+import 'package:cashier/view/low_stock_page.dart';
 import 'package:flutter/material.dart';
-
 
 class NotificationItem {
   final IconData icon;
@@ -24,9 +24,7 @@ class NotificationsPage extends StatefulWidget {
 }
 
 class _NotificationsPageState extends State<NotificationsPage> {
-
   final LocalDatabase localDb = LocalDatabase();
-
   List<NotificationItem> notifications = [];
   bool loading = true;
 
@@ -37,37 +35,42 @@ class _NotificationsPageState extends State<NotificationsPage> {
   }
 
   Future<void> loadNotifications() async {
-
     List<NotificationItem> items = [];
 
-    /// ---------------- PENDING SYNC ----------------
+    // Pending sync
     final pendingTransactions = await localDb.getPendingTransactions();
-
     if (pendingTransactions.isNotEmpty) {
-      items.add(
-        NotificationItem(
-          icon: Icons.sync_problem,
-          color: Colors.orange,
-          title: "Pending Sync",
-          message:
-              "${pendingTransactions.length} transactions waiting to sync. Turn on WiFi.",
-        ),
-      );
+      items.add(NotificationItem(
+        icon: Icons.sync_problem,
+        color: Colors.orange,
+        title: "Pending Sync",
+        message:
+            "${pendingTransactions.length} transactions waiting to sync. Turn on WiFi.",
+      ));
     }
 
-    /// ---------------- LOW STOCK ----------------
+    // Low stock
     final lowStockProducts = await localDb.getLowStockProducts();
-
     if (lowStockProducts.isNotEmpty) {
-      items.add(
-        NotificationItem(
-          icon: Icons.warning,
-          color: Colors.red,
-          title: "Low Stock Alert",
-          message:
-              "${lowStockProducts.length} products are low on stock.",
-        ),
-      );
+      items.add(NotificationItem(
+        icon: Icons.warning,
+        color: Colors.red,
+        title: "Low Stock Alert",
+        message:
+            "${lowStockProducts.length} products are low on stock.",
+      ));
+    }
+
+    // Missing barcode
+    final noBarcodeProducts = await localDb.getProductsWithoutBarcode();
+    if (noBarcodeProducts.isNotEmpty) {
+      items.add(NotificationItem(
+        icon: Icons.qr_code_2,
+        color: Colors.blue,
+        title: "Missing Barcode",
+        message:
+            "${noBarcodeProducts.length} products do not have a barcode yet.",
+      ));
     }
 
     if (mounted) {
@@ -80,30 +83,32 @@ class _NotificationsPageState extends State<NotificationsPage> {
 
   @override
   Widget build(BuildContext context) {
-
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Message"),
+        title: const Text("Notifications"),
       ),
-
       body: loading
           ? const Center(child: CircularProgressIndicator())
           : notifications.isEmpty
-              ? const Center(
-                  child: Text(
-                    "No notifications",
-                    style: TextStyle(fontSize: 16),
-                  ),
-                )
+              ? const Center(child: Text("No notifications"))
               : ListView.separated(
                   padding: const EdgeInsets.all(12),
                   itemCount: notifications.length,
                   separatorBuilder: (_, __) => const Divider(),
                   itemBuilder: (context, index) {
-
                     final notif = notifications[index];
 
                     return ListTile(
+                      onTap: () {
+                        if (notif.title == "Low Stock Alert") {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const LowStockPage(),
+                            ),
+                          );
+                        }
+                      },
                       leading: CircleAvatar(
                         backgroundColor: notif.color.withOpacity(0.15),
                         child: Icon(
@@ -111,14 +116,12 @@ class _NotificationsPageState extends State<NotificationsPage> {
                           color: notif.color,
                         ),
                       ),
-
                       title: Text(
                         notif.title,
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-
                       subtitle: Text(notif.message),
                     );
                   },

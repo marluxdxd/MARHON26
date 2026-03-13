@@ -59,6 +59,8 @@ dependencies:
   audioplayers: ^6.6.0
   vibration: ^3.1.8
   flutter_local_notifications: ^17.0.0
+  android_alarm_manager_plus: ^5.0.0
+  workmanager: ^0.9.0+3
 
 
 
