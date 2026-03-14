@@ -9,6 +9,7 @@ import 'package:cashier/services/sync_service.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:internet_connection_checker/internet_connection_checker.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
 String generateUniqueId({String prefix = "S"}) {
@@ -26,6 +27,8 @@ class ProductService {
       StreamController.broadcast();
 
   Stream<void> get productRefreshStream => productRefreshController.stream;
+  
+  String? userId;
 
   void notifyProductChanged() {
     productRefreshController.add(null);
@@ -66,16 +69,16 @@ class ProductService {
         "is_synced": 0,
         "updated_at": DateTime.now().toIso8601String(),
       },
-      where: "id = ?",
-      whereArgs: [id],
+      where: "id = ? AND user_id = ?",
+      whereArgs: [id, Supabase.instance.client.auth.currentUser!.id],
     );
 
     // 2️⃣ Try Sync Immediately If Online
     try {
       final product = await db.query(
         "products",
-        where: "id = ?",
-        whereArgs: [id],
+        where: "id = ? AND user_id = ?",
+        whereArgs: [id,Supabase.instance.client.auth.currentUser!.id],
       );
 
       if (product.isNotEmpty) {
@@ -185,6 +188,7 @@ class ProductService {
           otherQty: p['other_qty'] as int? ?? 0,
           clientUuid: p['client_uuid']?.toString(),
           lowStock: p['low_stock_threshold'] as int? ?? 0,
+          userId: p['user_id'] as String,
         );
       }
 
@@ -214,6 +218,7 @@ class ProductService {
               productClientUuid: e['client_uuid'] as String,
               otherQty: e['other_qty'] ?? 0,
               lowStock: e['low_stock_threshold'] ?? 0,
+              userid: e['user_id'],
             ),
           )
           .toList();
@@ -231,8 +236,8 @@ class ProductService {
     // Get current stock
     final productList = await db.query(
       'products',
-      where: 'id = ?',
-      whereArgs: [productId],
+      where: 'id = ? AND user_id = ?',
+      whereArgs: [productId, Supabase.instance.client.auth.currentUser!.id],
     );
     if (productList.isEmpty) {
       print("❌ Product not found locally");
@@ -266,6 +271,7 @@ class ProductService {
       'change_type': changeType,
       'trans_date': transDate,
       'is_synced': 0,
+      'user_id': Supabase.instance.client.auth.currentUser?.id,
     });
 
     print("Stock reduced for product $productId: $oldStock → $newStock");
@@ -285,8 +291,8 @@ class ProductService {
     // 1️⃣ Get all unsynced stock history
     final unsyncedHistory = await db.query(
       'product_stock_history',
-      where: 'is_synced = ?',
-      whereArgs: [0],
+      where: 'is_synced = ? AND user_id = ?',
+      whereArgs: [0, Supabase.instance.client.auth.currentUser!.id],
     );
     print("➡️ Unsynced history count: ${unsyncedHistory.length}");
 
@@ -309,8 +315,8 @@ class ProductService {
         // 3️⃣ Fetch local product by client_uuid
         final productList = await db.query(
           'products',
-          where: 'client_uuid = ?',
-          whereArgs: [clientUuid],
+          where: 'client_uuid = ? AND user_id = ?',
+          whereArgs: [clientUuid, Supabase.instance.client.auth.currentUser!.id],
         );
 
         if (productList.isEmpty) {
@@ -349,7 +355,6 @@ class ProductService {
               })
               .select('id')
               .maybeSingle();
-              
 
           if (inserted == null || inserted['id'] == null) {
             print(
@@ -383,6 +388,7 @@ class ProductService {
                 entry['created_at']?.toString() ??
                 DateTime.now().toIso8601String(),
             'product_client_uuid': clientUuid,
+            'user_id':Supabase.instance.client.auth.currentUser!.id,
           });
         } catch (e) {
           print(
@@ -463,7 +469,7 @@ class ProductService {
         print("🔁 Updated product '$name' on Supabase");
       } else {
         // ➕ Insert new product
-        await supabase.from('products').insert({
+        await supabase.from('products').upsert({
           'name': name,
           'barcode': barcode,
           'cost_price': costPrice,
@@ -474,7 +480,12 @@ class ProductService {
           'other_qty': otherQty,
           'client_uuid': clientUuid,
           'low_stock_threshold': lowStock,
-        });
+          'user_id': Supabase.instance.client.auth.currentUser!.id, // 🔹 MUST
+        },
+        onConflict: 'client_uuid',
+        );
+        onConflict:
+        ['client_uuid'];
         print("➕ Inserted product '$name' to Supabase");
       }
 
@@ -499,8 +510,8 @@ class ProductService {
     bool isPromo = false,
     int otherQty = 0,
     required int byPieces,
-
     int lowStock = 0,
+    String? userid,
   }) async {
     final db = await localDb.database;
 
@@ -521,6 +532,7 @@ class ProductService {
       'is_synced': 0,
       'client_uuid': clientUuid, // ✅ NEVER NULL
       'low_stock_threshold': lowStock, // ✅ Add low stock threshold
+      'user_id': Supabase.instance.client.auth.currentUser!.id,
     });
   }
 
@@ -554,8 +566,8 @@ class ProductService {
     // ✅ Get latest unsynced product
     final unsynced = await db.query(
       'products',
-      where: 'is_synced = ?',
-      whereArgs: [0],
+      where: 'is_synced = ? AND user_id = ?',
+      whereArgs: [0, Supabase.instance.client.auth.currentUser!.id],
       orderBy: 'id DESC', // latest first
       limit: 1, // only ONE product
     );
@@ -624,7 +636,7 @@ class ProductService {
           print("🔁 Updated product '${p['name']}' on Supabase");
         } else {
           // ➕ INSERT new product
-          await supabase.from('products').insert({
+          await supabase.from('products').upsert({
             'name': p['name'],
             'barcode': barcode,
             'by_pieces': byPieces,
@@ -635,7 +647,10 @@ class ProductService {
             'other_qty': otherQty,
             'client_uuid': clientUuid,
             'low_stock_threshold': lowStock,
-          });
+            'user_id': Supabase.instance.client.auth.currentUser!.id,
+          },
+          onConflict: 'client_uuid',
+          );
           print("➕ Inserted product '${p['name']}' to Supabase");
         }
 
@@ -643,7 +658,7 @@ class ProductService {
         await db.update(
           'products',
           {'is_synced': 1},
-          where: 'id = ?',
+          where: 'id = ? AND user_id = ?',
           whereArgs: [p['id']],
         );
 
@@ -674,6 +689,9 @@ class ProductService {
   '''),
     );
     for (var p in unsynced) {
+        print("SYNC PRODUCT UUID: ${p['client_uuid']}");
+  print("SYNC PRODUCT NAME: ${p['name']}");
+  print("LOCAL PRODUCT ID: ${p['id']}");
       final clientUuid = p['client_uuid']?.toString();
       if (clientUuid == null || clientUuid.isEmpty) {
         print("Skipping product without client_uuid: ${p['name']}");
@@ -705,7 +723,7 @@ class ProductService {
               .eq('id', existing['id']);
         } else {
           // 3️⃣ INSERT new product with client_uuid
-          await supabase.from('products').insert({
+          await supabase.from('products').upsert({
             'name': p['name'],
             'barcode': p['barcode'],
             'retail_price': p['retail_price'],
@@ -715,7 +733,10 @@ class ProductService {
             'other_qty': p['other_qty'],
             'client_uuid': clientUuid,
             'low_stock_threshold': p['low_stock_threshold'] ?? 0,
-          });
+            'user_id': p['user_id'],
+          },
+            onConflict: 'client_uuid',
+          );
         }
 
         // 4️⃣ Mark as synced locally
@@ -723,8 +744,8 @@ class ProductService {
           (db) => db.update(
             'products',
             {'is_synced': 1},
-            where: 'id = ?',
-            whereArgs: [p['id']],
+            where: 'id = ? AND user_id = ?',
+            whereArgs: [p['id'],p['user_id']],
           ),
         );
 
@@ -831,6 +852,7 @@ class ProductService {
           retailPrice: (item['retail_price'] as num).toDouble(),
           isPromo: item['is_promo'] as bool? ?? false,
           otherQty: item['other_qty'] as int? ?? 0,
+          userId: item['user_id'] as  String,
         );
       }
 
@@ -868,7 +890,7 @@ class ProductService {
     final clientUuid =
         "P_${DateTime.now().millisecondsSinceEpoch}_${DateTime.now().microsecondsSinceEpoch}";
 
-    await supabase.from('products').insert({
+    await supabase.from('products').upsert({
       'name': name,
       'barcode': barcode,
       'cost_price': costPrice,
@@ -879,7 +901,10 @@ class ProductService {
       'other_qty': otherQty,
       'client_uuid': clientUuid,
       'low_stock_threshold': lowStock,
-    });
+      'user_id': Supabase.instance.client.auth.currentUser!.id,
+    },
+      onConflict: 'client_uuid',
+    );
   }
 
   Future<List<Productclass>> getProducts({bool offlineOnly = true}) async {
@@ -1017,8 +1042,8 @@ class ProductService {
     // ✅ Get product by id
     final pList = await db.query(
       'products',
-      where: 'id = ?',
-      whereArgs: [productId],
+      where: 'id = ? and user_id = ?',
+      whereArgs: [productId, Supabase.instance.client.auth.currentUser!.id],
     );
 
     if (pList.isEmpty) return;
@@ -1042,6 +1067,7 @@ class ProductService {
     final isPromo = (p['is_promo'] ?? 0) == 1;
     final otherQty = p['other_qty'] as int;
     final lowStock = p['low_stock_threshold'] as int? ?? 0;
+    final userId = p['user_id'] as String;
 
     try {
       final existing = await supabase
@@ -1065,12 +1091,13 @@ class ProductService {
               'other_qty': otherQty,
               'updated_at': DateTime.now().toIso8601String(),
               'low_stock_threshold': lowStock,
+              'user_id': Supabase.instance.client.auth.currentUser!.id
             })
             .eq('id', existing['id']);
         print("🔁 Updated product '${p['name']}' on Supabase");
       } else {
         // Insert new
-        await supabase.from('products').insert({
+        await supabase.from('products').upsert({
           'name': p['name'],
           'barcode': p['barcode'],
           'cost_price': costPrice,
@@ -1082,7 +1109,10 @@ class ProductService {
           'client_uuid': clientUuid,
           'updated_at': DateTime.now().toIso8601String(),
           'low_stock_threshold': lowStock,
-        });
+          'user_id': Supabase.instance.client.auth.currentUser!.id,
+        },
+        onConflict: 'client_uuid',
+        );
         print("➕ Inserted product '${p['name']}' to Supabase");
       }
 
@@ -1090,8 +1120,8 @@ class ProductService {
       await db.update(
         'products',
         {'is_synced': 1},
-        where: 'id = ?',
-        whereArgs: [p['id']],
+        where: 'id = ? AND user_id = ?',
+        whereArgs: [p['id'], p['user_id']],
       );
     } catch (e) {
       print("❌ Failed to sync ${p['name']}: $e");
@@ -1114,9 +1144,9 @@ class ProductService {
       qty: qty,
       costPrice: product.costPrice,
       retailPrice: product.retailPrice,
-
       isPromo: isPromo,
       otherQty: otherQty,
+      userId: Supabase.instance.client.auth.currentUser?.id,
     );
   }
 
@@ -1129,8 +1159,8 @@ class ProductService {
     // Kuhaon tanan unsynced transaction items (is_synced = 0)
     final unsyncedItems = await db.query(
       'transaction_items',
-      where: 'is_synced = ?',
-      whereArgs: [0],
+      where: 'is_synced = ? AND user_id = ?',
+      whereArgs: [0, Supabase.instance.client.auth.currentUser!.id],
     );
 
     for (var item in unsyncedItems) {
@@ -1232,6 +1262,7 @@ class ProductService {
                 'qty': qty,
                 'is_promo': isPromo,
                 'other_qty': otherQty,
+                'user_id': Supabase.instance.client.auth.currentUser!.id,
               })
               .eq('id', existingItem['id']);
         } else {
@@ -1246,6 +1277,7 @@ class ProductService {
             'is_promo': isPromo,
             'other_qty': otherQty,
             'product_client_uuid': productClientUuid,
+            'user_id': Supabase.instance.client.auth.currentUser!.id,
           });
         }
 
@@ -1253,8 +1285,8 @@ class ProductService {
         await db.update(
           'transaction_items',
           {'is_synced': 1},
-          where: 'id = ?',
-          whereArgs: [localId],
+          where: 'id = ? AND user_id = ?',
+          whereArgs: [localId, Supabase.instance.client.auth.currentUser!.id],
         );
 
         print("✅ Synced transaction item id $localId successfully!");

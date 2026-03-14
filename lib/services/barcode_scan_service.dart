@@ -1,6 +1,7 @@
 import 'package:cashier/services/scan_mode.dart';
 import 'package:cashier/widget/addproduct.dart';
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../view/barcode.dart';
 import '../class/posrowclass.dart';
 import '../class/productclass.dart';
@@ -147,7 +148,7 @@ class BarcodeScanService {
                             context,
                             MaterialPageRoute(
                               builder: (_) =>
-                                  AddProductPage(barcode: cleanBarcode),
+                                  AddProductPage(barcode: cleanBarcode,userId: Supabase.instance.client.auth.currentUser!.id,),
                             ),
                           );
 
@@ -184,6 +185,7 @@ class BarcodeScanService {
           builder: (_) => AddProductPage(
             product: selectedProduct,
             barcode: cleanBarcode, // pass scanned barcode
+            userId: Supabase.instance.client.auth.currentUser!.id,
           ),
         ),
       );

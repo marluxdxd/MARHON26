@@ -107,6 +107,7 @@ class _StockScreenState extends State<StockScreen>
     type: changeType,
   );
 
+
   // 3️⃣ Insert into Supabase stock history if online
   if (await _isOnline()) {
     try {
@@ -121,6 +122,7 @@ class _StockScreenState extends State<StockScreen>
         'product_client_uuid': product.productClientUuid, // ✅ corrected
         'cost_price': product.costPrice,
         'retail_price': product.retailPrice,
+        'user_id': Supabase.instance.client.auth.currentUser!.id,
       });
       print('✅ Stock history inserted for ${product.name} | type=$changeType');
     } catch (e) {

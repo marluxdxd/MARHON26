@@ -14,9 +14,7 @@ import 'package:flutter/material.dart';
 import 'bottom_nav_bar.dart';
 
 class MainNav extends StatefulWidget {
-  final String role; // guest or master
-
-  const MainNav({super.key, required this.role});
+  const MainNav({super.key});
 
   @override
   State<MainNav> createState() => _MainNavState();
@@ -59,17 +57,6 @@ class _MainNavState extends State<MainNav> {
   }
 
   void _handleTabChange(int index) {
-    bool isGuest = widget.role == "guest";
-
-    /// BLOCK ACCESS FOR GUEST
-    // if (isGuest && (index == 1 )) {
-    //   ScaffoldMessenger.of(context).showSnackBar(
-    //     const SnackBar(content: Text("Guest cannot access this page")),
-    //   );
-
-    //   return;
-    // }
-
     setState(() {
       _currentIndex = index;
     });
@@ -94,13 +81,13 @@ class _MainNavState extends State<MainNav> {
           ),
 
           /// PRODUCT VIEW
-          Productview(role: widget.role),
+          Productview(),
 
           /// TRANSACTION HISTORY
           TransactionHistoryScreen(),
 
           /// PROFILE
-          ProfileView(role: widget.role),
+          ProfileView(),
         ],
       ),
 
@@ -130,7 +117,7 @@ class _MainNavState extends State<MainNav> {
       bottomNavigationBar: BottomNavBar(
         currentIndex: _currentIndex,
         onTabSelected: _handleTabChange,
-        role: widget.role, 
+        role: "user",
       ),
     );
   }

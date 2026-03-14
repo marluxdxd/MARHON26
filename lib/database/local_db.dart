@@ -1,5 +1,6 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
 class LocalDatabase {
@@ -81,53 +82,59 @@ class LocalDatabase {
   }
 
   // ------------------------- DATABASE INITIALIZATION ----------------- //
- Future<Database> _initDB() async {
-  final dbPath = await getDatabasesPath();
-  final path = join(dbPath, 'app1.db');
+  Future<Database> _initDB() async {
+    final dbPath = await getDatabasesPath();
+    final path = join(dbPath, 'app1.db');
 
-  final db = await openDatabase(
-    path,
-    version: 2,
-    onCreate: (db, version) async {
-      await _createTables(db);
-    },
-    onUpgrade: (db, oldVersion, newVersion) async {
-      if (oldVersion < 2) {
-        // Helper function to check if column exists
-        Future<bool> columnExists(String table, String column) async {
-          final result = await db.rawQuery("PRAGMA table_info($table)");
-          return result.any((col) => col['name'] == column);
+    final db = await openDatabase(
+      path,
+      version: 2,
+      onCreate: (db, version) async {
+        await _createTables(db);
+      },
+      onUpgrade: (db, oldVersion, newVersion) async {
+        if (oldVersion < 2) {
+          // Helper function to check if column exists
+          Future<bool> columnExists(String table, String column) async {
+            final result = await db.rawQuery("PRAGMA table_info($table)");
+            return result.any((col) => col['name'] == column);
+          }
+
+          if (!await columnExists('products', 'barcode')) {
+            await db.execute("ALTER TABLE products ADD COLUMN barcode TEXT");
+          }
+
+          if (!await columnExists('products', 'by_pieces')) {
+            await db.execute(
+              "ALTER TABLE products ADD COLUMN by_pieces INTEGER DEFAULT 0",
+            );
+          }
+
+          if (!await columnExists('products', 'other_qty')) {
+            await db.execute(
+              "ALTER TABLE products ADD COLUMN other_qty INTEGER DEFAULT 0",
+            );
+          }
+
+          if (!await columnExists('products', 'client_uuid')) {
+            await db.execute(
+              "ALTER TABLE products ADD COLUMN client_uuid TEXT",
+            );
+          }
+
+          // ✅ Corrected: add low_stock_threshold with DEFAULT 0
+          if (!await columnExists('products', 'low_stock_threshold')) {
+            await db.execute(
+              "ALTER TABLE products ADD COLUMN low_stock_threshold INTEGER NULL",
+            );
+          }
         }
+      },
+    );
 
-        if (!await columnExists('products', 'barcode')) {
-          await db.execute("ALTER TABLE products ADD COLUMN barcode TEXT");
-        }
-
-        if (!await columnExists('products', 'by_pieces')) {
-          await db.execute("ALTER TABLE products ADD COLUMN by_pieces INTEGER DEFAULT 0");
-        }
-
-        if (!await columnExists('products', 'other_qty')) {
-          await db.execute("ALTER TABLE products ADD COLUMN other_qty INTEGER DEFAULT 0");
-        }
-
-        if (!await columnExists('products', 'client_uuid')) {
-          await db.execute("ALTER TABLE products ADD COLUMN client_uuid TEXT");
-        }
-
-        // ✅ Corrected: add low_stock_threshold with DEFAULT 0
-        if (!await columnExists('products', 'low_stock_threshold')) {
-          await db.execute(
-            "ALTER TABLE products ADD COLUMN low_stock_threshold INTEGER NULL"
-          );
-        }
-      }
-    },
-  );
-
-  await db.execute('PRAGMA foreign_keys = ON');
-  return db;
-}
+    await db.execute('PRAGMA foreign_keys = ON');
+    return db;
+  }
 
   Future<void> _createTables(Database db) async {
     // Products table
@@ -138,7 +145,7 @@ class LocalDatabase {
     value TEXT
   )
 ''');
-   await db.execute('''
+    await db.execute('''
   CREATE TABLE IF NOT EXISTS transaction_promos(
        id INTEGER PRIMARY KEY AUTOINCREMENT,
   transaction_id INTEGER NOT NULL,
@@ -149,6 +156,7 @@ class LocalDatabase {
   total REAL NOT NULL,
   created_at TEXT DEFAULT CURRENT_TIMESTAMP,
   is_synced INTEGER DEFAULT 0,
+  user_id TEXT,
   FOREIGN KEY (transaction_id) REFERENCES transactions(id) ON DELETE CASCADE
 )
 ''');
@@ -162,7 +170,8 @@ class LocalDatabase {
         other_qty INTEGER,
         is_synced INTEGER DEFAULT 0,
         client_uuid TEXT UNIQUE,
-        updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        user_id TEXT
   )
 ''');
     await db.execute('''
@@ -179,7 +188,8 @@ class LocalDatabase {
         other_qty INTEGER DEFAULT 0,
         is_synced INTEGER DEFAULT 0,
         client_uuid TEXT UNIQUE,
-        updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        user_id TEXT 
       )
     ''');
 
@@ -189,7 +199,8 @@ class LocalDatabase {
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     product_id INTEGER UNIQUE,
     old_stock INTEGER,
-    latest_stock INTEGER
+    latest_stock INTEGER,
+    user_id TEXT
   )
 ''');
 
@@ -203,7 +214,8 @@ class LocalDatabase {
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
         is_synced INTEGER DEFAULT 0,
         supabase_id INTEGER,
-        client_uuid TEXT UNIQUE
+        client_uuid TEXT UNIQUE,
+        user_id TEXT
       )
     ''');
 
@@ -222,7 +234,8 @@ CREATE TABLE product_stock_history (
   type TEXT,  
   created_at TEXT,
   product_client_uuid TEXT,
-  is_synced INTEGER
+  is_synced INTEGER,
+  user_id TEXT
 )
 ''');
 
@@ -241,6 +254,7 @@ CREATE TABLE transaction_items(
   is_synced INTEGER DEFAULT 0,
   supabase_id INTEGER,
   product_client_uuid text NOT NULL,
+  user_id TEXT,
   UNIQUE(transaction_id, product_id, product_client_uuid)
 )
 ''');
@@ -254,6 +268,7 @@ CREATE TABLE transaction_items(
         type TEXT NOT NULL,
         is_synced INTEGER DEFAULT 0,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        user_id TEXT,
         FOREIGN KEY(product_id) REFERENCES products(id) ON DELETE CASCADE
       )
     ''');
@@ -276,33 +291,41 @@ CREATE TABLE transaction_items(
 
     return result;
   }
-  
 
-Future<List<Map<String, dynamic>>> getPendingTransactions() async {
-  final db = await database;
+  Future<List<Map<String, dynamic>>> getPendingTransactions() async {
+    final db = await database;
 
-  return await db.query(
-    'transactions',
-    where: 'is_synced = ?',
-    whereArgs: [0],
-  );
-}
-Future<List<Map<String, dynamic>>> getLowStockProducts() async {
-  final db = await database;
+    return await db.query(
+      'transactions',
+      where: 'is_synced = ? AND user_id = ?',
+      whereArgs: [0, currentUserId],
+    );
+  }
+ /// ---------------- CURRENT USER ----------------
+  String? get currentUserId =>
+      Supabase.instance.client.auth.currentUser?.id;
 
-  return await db.query(
-    'products',
-    where: 'low_stock_threshold IS NOT NULL AND stock <= low_stock_threshold',
-  );
-}
-Future<List<Map<String, dynamic>>> getProductsWithoutBarcode() async {
-  final db = await database;
+///------------------------------------------------
+  Future<List<Map<String, dynamic>>> getLowStockProducts() async {
+    final db = await database;
 
-  return await db.query(
-    'products',
-    where: 'barcode IS NULL OR barcode = ""',
-  );
-}
+    return await db.query(
+      'products',
+      where: 'low_stock_threshold IS NOT NULL AND stock <= low_stock_threshold AND user_id = ?',
+      whereArgs: [currentUserId],
+      
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> getProductsWithoutBarcode() async {
+    final db = await database;
+
+    return await db.query('products',
+     where: '(barcode IS NULL OR barcode = "") AND user_id = ?',
+      whereArgs: [currentUserId],
+    );
+  }
+
   // ------------------------------ GET MONTHLY ITEMS -------------------------------- //
   Future<List<Map<String, dynamic>>> getMonthlyItems(String month) async {
     final db = await database;
@@ -312,7 +335,7 @@ Future<List<Map<String, dynamic>>> getProductsWithoutBarcode() async {
     SELECT 
       ti.product_name,
       ti.qty,
-      ti.retail_price
+      ti.retail_price,
       ti.cost_price,
     FROM transaction_items ti
     JOIN transactions t ON ti.transaction_id = t.id
@@ -491,12 +514,14 @@ Future<List<Map<String, dynamic>>> getProductsWithoutBarcode() async {
 
   // ------------------- GET UNSYNCED TRANSACTIONS ------------------- //
   Future<List<Map<String, dynamic>>> getUnsyncedTransactions() async {
-    // 🔑 Get database instance
-    final db = await database;
+  final db = await database;
 
-    // ✅ Fetch all transactions that have not been synced to server
-    return await db.rawQuery('SELECT * FROM transactions WHERE is_synced = 0');
-  }
+  return await db.query(
+    'transactions',
+    where: 'is_synced = ? AND user_id = ?',
+    whereArgs: [0, currentUserId],
+  );
+}
 
   // ------------------- GET UNSYNCED ITEMS FOR A TRANSACTION ------------------- //
   Future<List<Map<String, dynamic>>> getItemsForTransaction(int trxId) async {
@@ -629,6 +654,7 @@ Future<List<Map<String, dynamic>>> getProductsWithoutBarcode() async {
       'type': type, // type of update
       'is_synced': 0, // default unsynced
       'created_at': DateTime.now().toIso8601String(), // timestamp
+      'user_id': currentUserId,
     });
   }
 
@@ -648,7 +674,7 @@ Future<List<Map<String, dynamic>>> getProductsWithoutBarcode() async {
     int otherQty = 0,
     String? clientUuid,
     int lowStock = 0,
-    
+    String? userId,
   }) async {
     final db = await database;
     return await db.insert(
@@ -664,7 +690,8 @@ Future<List<Map<String, dynamic>>> getProductsWithoutBarcode() async {
         'is_promo': isPromo ? 1 : 0,
         'other_qty': otherQty,
         'client_uuid': clientUuid, // <- save it
-        'low_stock_threshold': lowStock, // ✅ Add low stock threshold
+        'low_stock_threshold': lowStock,
+        'user_id': userId, // ✅ Add low stock threshold
       },
       conflictAlgorithm: ConflictAlgorithm.replace, // update if exists
     );
@@ -673,7 +700,11 @@ Future<List<Map<String, dynamic>>> getProductsWithoutBarcode() async {
   // 🔹 Fetch all products from local DB
   Future<List<Map<String, dynamic>>> getProducts() async {
     final db = await database;
-    return await db.query('products');
+    return await db.query(
+      'products',
+      where: 'user_id = ?',
+      whereArgs: [currentUserId],
+      );
   }
 
   // 🔹 Delete a product by ID
@@ -693,95 +724,92 @@ Future<List<Map<String, dynamic>>> getProductsWithoutBarcode() async {
     );
   }
 
-Future<void> updateProduct({
-  required int id,
-  required int stock,
-  required String barcode,
-  required double byPieces,
-  required double costPrice,
-  required double retailPrice,
-  required bool isPromo,
-  required int otherQty,
-  int lowStock = 0,
-}) async {
-  final dbClient = await database;
+  Future<void> updateProduct({
+    required int id,
+    required int stock,
+    required String barcode,
+    required double byPieces,
+    required double costPrice,
+    required double retailPrice,
+    required bool isPromo,
+    required int otherQty,
+    int lowStock = 0,
+    String? userid,
+  }) async {
+    final dbClient = await database;
 
-  // Update the product
-  await dbClient.update(
-    'products',
-    {
-      'stock': stock,
-      'barcode': barcode,
-      'by_pieces': byPieces,
-      'cost_price': costPrice,
-      'retail_price': retailPrice,
-      'is_promo': isPromo ? 1 : 0,
-      'other_qty': otherQty,
-      'low_stock_threshold': lowStock, // ✅ Add low stock threshold
-    },
-    where: 'id = ?',
-    whereArgs: [id],
-  );
+    // Update the product
+    await dbClient.update(
+      'products',
+      {
+        'stock': stock,
+        'barcode': barcode,
+        'by_pieces': byPieces,
+        'cost_price': costPrice,
+        'retail_price': retailPrice,
+        'is_promo': isPromo ? 1 : 0,
+        'other_qty': otherQty,
+        'low_stock_threshold': lowStock, // ✅ Add low stock threshold
+        'user_id': userid,
+      },
+      where: 'id = ?',
+      whereArgs: [id],
+    );
 
-  // Reset SQLite AUTOINCREMENT sequence for products
-  await dbClient.rawUpdate('''
+    // Reset SQLite AUTOINCREMENT sequence for products
+    await dbClient.rawUpdate('''
     UPDATE sqlite_sequence
     SET seq = (SELECT MAX(id) FROM products)
     WHERE name = 'products';
   ''');
-}
-
+  }
 
   // ------------------- TRANSACTIONS CRUD ------------------- //
   // 🔹 Insert a new transaction (ignores conflict if ID exists)
 
   Future<bool> transactionExistsBySupabaseId(int supabaseId) async {
-  final db = await database;
-  final res = await db.query(
-    'transactions',
-    where: 'supabase_id = ?',
-    whereArgs: [supabaseId],
-    limit: 1,
-  );
-  return res.isNotEmpty;
-}
+    final db = await database;
+    final res = await db.query(
+      'transactions',
+      where: 'supabase_id = ?',
+      whereArgs: [supabaseId],
+      limit: 1,
+    );
+    return res.isNotEmpty;
+  }
 
-Future<void> updateTransactionSupabaseId({
-  required int localId,
-  required int supabaseId,
-}) async {
-  final db = await database;
+  Future<void> updateTransactionSupabaseId({
+    required int localId,
+    required int supabaseId,
+  }) async {
+    final db = await database;
 
-  await db.update(
-    'transactions',
-    {
-      'supabase_id': supabaseId,
-      'is_synced': 1, // mark as synced
-    },
-    where: 'id = ?',
-    whereArgs: [localId],
-  );
+    await db.update(
+      'transactions',
+      {
+        'supabase_id': supabaseId,
+        'is_synced': 1, // mark as synced
+      },
+      where: 'id = ?',
+      whereArgs: [localId],
+    );
 
-  print(
-    "✅ Transaction synced | localId=$localId supabaseId=$supabaseId",
-  );
-}
+    print("✅ Transaction synced | localId=$localId supabaseId=$supabaseId");
+  }
 
+  Future<int> insertTransaction({
+    required double total,
+    required double cash,
+    required double change,
+    String? createdAt,
+    int isSynced = 0,
+    String? clientUuid,
+    int? supabaseId, // ✅ ADD THIS
+    String? userId,
+  }) async {
+    final db = await database;
 
-Future<int> insertTransaction({
-  required double total,
-  required double cash,
-  required double change,
-  String? createdAt,
-  int isSynced = 0,
-  String? clientUuid,
-  int? supabaseId, // ✅ ADD THIS
-}) async {
-  final db = await database;
-
-  final int localId = await db.insert(
-    'transactions',
-    {
+    final int localId = await db.insert('transactions', {
       'total': total,
       'cash': cash,
       'change': change,
@@ -789,17 +817,21 @@ Future<int> insertTransaction({
       'is_synced': isSynced,
       'client_uuid': clientUuid,
       'supabase_id': supabaseId, // ✅ SAVE SERVER ID
-    },
-    conflictAlgorithm: ConflictAlgorithm.ignore,
-  );
+      'user_id': Supabase.instance.client.auth.currentUser?.id,
+    }, conflictAlgorithm: ConflictAlgorithm.ignore);
 
-  return localId; // ✅ LOCAL SQLITE ID
-}
+    return localId; // ✅ LOCAL SQLITE ID
+  }
 
   // 🔹 Fetch all transactions from local DB
   Future<List<Map<String, dynamic>>> getTransactions() async {
     final db = await database;
-    return await db.query('transactions');
+    return await db.query(
+      'transactions',
+       where: 'user_id = ?',
+    whereArgs: [currentUserId],
+  
+      );
   }
 
   // 🔹 Delete a transaction by ID
@@ -808,44 +840,38 @@ Future<int> insertTransaction({
     return await db.delete('transactions', where: 'id = ?', whereArgs: [id]);
   }
 
-
   // ------------------- TRANSACTION ITEMS CRUD ------------------- //                                         OFFLINE
   // 🔹 Insert a new transaction item (replace if ID exists)
-Future<int> insertTransactionItem({
+  Future<int> insertTransactionItem({
+    required int transactionId,
+    required int productId,
+    required String productName,
+    required int qty,
+    required double costPrice,
+    required double retailPrice,
+    bool isPromo = false,
+    int otherQty = 0,
+    int isSynced = 0, // 0 = not synced, 1 = synced
+    String? productClientUuid,
+    required String? userId,
+  }) async {
+    final db = await database;
 
-  required int transactionId,
-  required int productId,
-  required String productName,
-  required int qty,
-  required double costPrice,
-  required double retailPrice,
-  bool isPromo = false,
-  int otherQty = 0,
-  int isSynced = 0, // 0 = not synced, 1 = synced
-  String? productClientUuid,
-
-}) async {
-  final db = await database;
-
-  try {
-    print("🟡 INSERTING transaction_items:");
-    print("🟡 transaction_id: $transactionId");
-    print("  product_id: $productId");
-    print("  product_name: $productName");
-    print("  qty: $qty");
-    print("  cost_price: $costPrice");
-    print("  retail_price: $retailPrice");
-    print("  is_promo: ${isPromo ? 1 : 0}");
-    print("  other_qty: $otherQty");
-    print("  is_synced: $isSynced");
-    print("  product_client_uuid: $productClientUuid");
- // ⚠️ Ensure not null
-  final uuid = productClientUuid ?? const Uuid().v4();
-    final result = await db.insert(
-      
-      'transaction_items',
-      {
-    
+    try {
+      print("🟡 INSERTING transaction_items:");
+      print("🟡 transaction_id: $transactionId");
+      print("  product_id: $productId");
+      print("  product_name: $productName");
+      print("  qty: $qty");
+      print("  cost_price: $costPrice");
+      print("  retail_price: $retailPrice");
+      print("  is_promo: ${isPromo ? 1 : 0}");
+      print("  other_qty: $otherQty");
+      print("  is_synced: $isSynced");
+      print("  product_client_uuid: $productClientUuid");
+      // ⚠️ Ensure not null
+      final uuid = productClientUuid ?? const Uuid().v4();
+      final result = await db.insert('transaction_items', {
         'transaction_id': transactionId,
         'product_id': productId,
         'product_name': productName,
@@ -856,34 +882,34 @@ Future<int> insertTransactionItem({
         'other_qty': otherQty,
         'is_synced': isSynced,
         'product_client_uuid': uuid,
-      },
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+        'user_id': Supabase.instance.client.auth.currentUser?.id,
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
 
-    // ✅ QUERY BACK THE INSERTED ROW
-    final insertedRow = await db.query(
-      'transaction_items',
-      where: 'id = ?',
-      whereArgs: [result],
-    );
+      // ✅ QUERY BACK THE INSERTED ROW
+      final insertedRow = await db.query(
+        'transaction_items',
+        where: 'id = ?',
+        whereArgs: [result],
+      );
 
-    if (insertedRow.isNotEmpty) {
-      print("🎉 VERIFIED: Row successfully inserted into transaction_items!");
-      print("➡️ Row data: ${insertedRow.first}");
-    } else {
-      print("⚠️ WARNING: Row NOT found in transaction_items after insert!");
+      if (insertedRow.isNotEmpty) {
+        print("🎉 VERIFIED: Row successfully inserted into transaction_items!");
+        print("➡️ Row data: ${insertedRow.first}");
+      } else {
+        print("⚠️ WARNING: Row NOT found in transaction_items after insert!");
+      }
+
+      print("✅ LOCAL INSERT SUCCESSFUL (transaction_items)");
+      print("➡️ sqlite row id: $result");
+
+      return result;
+    } catch (e) {
+      print("❌ LOCAL INSERT FAILED (transaction_items)");
+      print("🔥 ERROR: $e");
+      rethrow;
     }
-
-    print("✅ LOCAL INSERT SUCCESSFUL (transaction_items)");
-    print("➡️ sqlite row id: $result");
-
-    return result;
-  } catch (e) {
-    print("❌ LOCAL INSERT FAILED (transaction_items)");
-    print("🔥 ERROR: $e");
-    rethrow;
   }
-}
+
   // 🔹 Fetch all transactions (main table)
   Future<List<Map<String, dynamic>>> getAllTransactions() async {
     final db = await database;
@@ -903,6 +929,7 @@ Future<int> insertTransactionItem({
     );
     return result;
   }
+
   Future<void> insertStockHistory({
     required int transactionId, // ✅ ADD
     required int id,
@@ -915,6 +942,7 @@ Future<int> insertTransactionItem({
     required String createdAt,
     required String productClientUuid,
     required int synced, // 0 = offline, 1 = online
+    required String? userId,
   }) async {
     final db = await database;
 
@@ -931,6 +959,7 @@ Future<int> insertTransactionItem({
       'created_at': createdAt,
       'product_client_uuid': productClientUuid,
       'is_synced': 0,
+      'user_id': Supabase.instance.client.auth.currentUser?.id,
     }, conflictAlgorithm: ConflictAlgorithm.replace);
 
     print(
@@ -963,17 +992,15 @@ Future<int> insertTransactionItem({
     required String name,
     required String barcode,
     required double cost_price,
-    required double retail_price, 
+    required double retail_price,
     required int stock,
     required double byPieces,
     required bool isPromo,
-    required int otherQty, 
+    required int otherQty,
     int lowStock = 0,
-    
+    String? userid,
   }) async {
     final db = await database;
-
-    
 
     final existing = await db.query(
       'products',
@@ -994,6 +1021,7 @@ Future<int> insertTransactionItem({
         'client_uuid': clientUuid,
         'is_synced': 1,
         'low_stock_threshold': lowStock, // ✅ Add low stock threshold
+        'user_id': userid,
       });
     } else {
       await db.update(
@@ -1004,10 +1032,11 @@ Future<int> insertTransactionItem({
           'cost_price': cost_price,
           'retail_price': retail_price,
           'stock': stock,
-          'by_pieces': byPieces, 
+          'by_pieces': byPieces,
           'is_promo': isPromo ? 1 : 0,
           'other_qty': otherQty,
           'low_stock_threshold': lowStock, // ✅ Add low stock threshold
+          'user_id': userid,
         },
         where: 'client_uuid = ?',
         whereArgs: [clientUuid],
@@ -1015,23 +1044,22 @@ Future<int> insertTransactionItem({
     }
   }
 
- // Add this function inside your LocalDatabase class
-Future<void> printAllTransactionItems() async {
-  final db = await database;
+  // Add this function inside your LocalDatabase class
+  Future<void> printAllTransactionItems() async {
+    final db = await database;
 
-  final rows = await db.query('transaction_items');
+    final rows = await db.query('transaction_items');
 
-  if (rows.isEmpty) {
-    print("📋 Walay transaction items sa local DB");
-    return;
+    if (rows.isEmpty) {
+      print("📋 Walay transaction items sa local DB");
+      return;
+    }
+
+    print("📋 Transaction Items in local DB:");
+    for (var row in rows) {
+      print(row);
+    }
   }
-
-  print("📋 Transaction Items in local DB:");
-  for (var row in rows) {
-    print(row);
-  }
-}
-
 
   Future<int> insertTransactionItemOffline({
     required int transactionId,
@@ -1042,30 +1070,27 @@ Future<void> printAllTransactionItems() async {
     required double retailPrice,
     bool isPromo = false,
     int otherQty = 0,
-  
+    String? userid,
+
     String? productClientUuid,
   }) async {
     final db = await database;
 
     final id = DateTime.now().millisecondsSinceEpoch; // unique local ID
 
-    return await db.insert(
-      'transaction_items',
-      {
-        'id': id,
-        'transaction_id': transactionId,
-        'product_id': productId,
-        'product_name': productName,
-        'qty': qty,
-        'cost_price': costPrice,
-        'retail_price': retailPrice,
-        'is_promo': isPromo ? 1 : 0,
-        'other_qty': otherQty,
-   
-        'product_client_uuid': productClientUuid,
-      },
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+    return await db.insert('transaction_items', {
+      'id': id,
+      'transaction_id': transactionId,
+      'product_id': productId,
+      'product_name': productName,
+      'qty': qty,
+      'cost_price': costPrice,
+      'retail_price': retailPrice,
+      'is_promo': isPromo ? 1 : 0,
+      'other_qty': otherQty,
+      'user_id': userid,
+      'product_client_uuid': productClientUuid,
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
   //-----------------------
@@ -1074,21 +1099,23 @@ Future<void> printAllTransactionItems() async {
     final db = await database;
     return await db.query(
       'transaction_items', // fetch tanan rows regardless of is_synced
-      orderBy: 'transaction_id DESC, id ASC',
+       where: 'user_id = ?',
+    whereArgs: [currentUserId],
+    orderBy: 'transaction_id DESC, id ASC',
     );
   }
 
   //-----------------------
   // GET ONLY UNSYNCED TRANSACTION ITEMS
-  Future<List<Map<String, dynamic>>> getUnsyncedTransactionItems() async {
-    final db = await database;
-    return await db.query(
-      'transaction_items',
-      where: 'is_synced = ?',
-      whereArgs: [0],
-    );
-  }
+Future<List<Map<String, dynamic>>> getUnsyncedTransactionItems() async {
+  final db = await database;
 
+  return await db.query(
+    'transaction_items',
+    where: 'is_synced = ? AND user_id = ?',
+    whereArgs: [0, currentUserId],
+  );
+}
   //-----------------------
   // MARK ITEM AS SYNCED
   Future<void> markTransactionItemSynced(int id) async {
@@ -1100,33 +1127,28 @@ Future<void> printAllTransactionItems() async {
       whereArgs: [id],
     );
   }
-  
+
   Future<void> resetLocalDatabase() async {
-  final db = await database;
+    final db = await database;
 
-  await db.transaction((txn) async {
-    await txn.delete('product_stock_history');
-    await txn.delete('transaction_items');
-    await txn.delete('transactions');
-    await txn.delete('transaction_promos');
-    // await txn.delete('products');
+    await db.transaction((txn) async {
+      await txn.delete('product_stock_history');
+      await txn.delete('transaction_items');
+      await txn.delete('transactions');
+      await txn.delete('transaction_promos');
+      // await txn.delete('products');
 
-    await txn.execute("DELETE FROM sqlite_sequence");
-  });
-}
+      await txn.execute("DELETE FROM sqlite_sequence");
+    });
+  }
 
   /// Resets the SQLite AUTOINCREMENT sequence for the 'products' table
   Future<void> resetLocalProductIdSequence() async {
-  final dbClient = await database;
-  await dbClient.rawUpdate('''
+    final dbClient = await database;
+    await dbClient.rawUpdate('''
     UPDATE sqlite_sequence
     SET seq = (SELECT MAX(id) FROM products)
     WHERE name = 'products';
   ''');
+  }
 }
-
-
-}
-
-
-

@@ -4,6 +4,7 @@ import 'package:cashier/database/local_db.dart';
 import 'package:cashier/services/sync_service.dart';
 import 'package:cashier/services/transaction_service.dart';
 import 'package:cashier/services/product_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
@@ -216,6 +217,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
           'trans_date': entry['trans_date']?.toString() ?? DateTime.now().toIso8601String(),
           'created_at': entry['created_at']?.toString() ?? DateTime.now().toIso8601String(),
           'product_client_uuid': clientUuid,
+          'user_id':Supabase.instance.client.auth.currentUser!.id,
         });
       } catch (e) {
         print("❌ Failed to insert stock history id ${entry['id']} to Supabase: $e");

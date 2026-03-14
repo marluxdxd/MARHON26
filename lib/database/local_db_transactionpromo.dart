@@ -1,4 +1,5 @@
 import 'package:cashier/database/local_db.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class LocalDbTransactionpromo {
   final db = LocalDatabase();
@@ -10,6 +11,7 @@ Future<int> insertTransactionPromo({
   required int promoCount,
   required double retailPrice,
   int isSynced = 0,
+  required String? userId,
 }) async {
   final database = await db.database;
 
@@ -35,6 +37,7 @@ Future<int> insertTransactionPromo({
       'retail_price': retailPrice,
       'total': total,
       'is_synced': isSynced,
+      'user_id': Supabase.instance.client.auth.currentUser?.id,
     },
   );
 

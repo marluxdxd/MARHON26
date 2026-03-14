@@ -2,30 +2,47 @@ import 'package:flutter/material.dart';
 import 'package:cashier/widget/addproduct.dart';
 import 'package:cashier/class/productclass.dart';
 import 'package:cashier/services/product_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class Productview extends StatefulWidget {
-  final String role; // "guest" or "master"
-  const Productview({super.key, required this.role});
+  const Productview({super.key});
 
   @override
   State<Productview> createState() => _ProductviewState();
 }
 
 class _ProductviewState extends State<Productview> with WidgetsBindingObserver {
-  String _stockFilter = "All"; // All, Low, High
   final ProductService _productService = ProductService();
+
   final ScrollController _scrollController = ScrollController();
+  final searchController = TextEditingController();
+
   List<Productclass> _products = [];
   List<Productclass> _filteredProducts = [];
+
   bool _isLoading = true;
-  final searchController = TextEditingController();
-  late bool isGuest;
+
+  String _stockFilter = "All";
+
+  bool? isGuest;
+  String userName = "User";
+  String userEmail = "";
+
+  late String currentUserId;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this); // observe app lifecycle
-    isGuest = widget.role == "guest";
+
+    WidgetsBinding.instance.addObserver(this);
+
+    final user = Supabase.instance.client.auth.currentUser;
+
+    if (user != null) {
+      currentUserId = user.id;
+    }
+
+    fetchUserRole();
     loadProducts();
   }
 
@@ -37,23 +54,55 @@ class _ProductviewState extends State<Productview> with WidgetsBindingObserver {
     super.dispose();
   }
 
-  /// Called when app lifecycle changes (like resuming from background)
+  /// APP RESUME REFRESH
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      loadProducts(); // auto refresh when page comes back into view
+      loadProducts();
     }
-    super.didChangeAppLifecycleState(state);
   }
 
-  /// ---------------- LOAD PRODUCTS ----------------
+  /// USER PROFILE
+  Future<void> fetchUserRole() async {
+    final currentUser = Supabase.instance.client.auth.currentUser;
+
+    if (currentUser == null) {
+      setState(() => isGuest = true);
+      return;
+    }
+
+    try {
+      final userRecord = await Supabase.instance.client
+          .from('profiles')
+          .select('full_name,email')
+          .eq('id', currentUser.id)
+          .maybeSingle();
+
+      setState(() {
+        userName = userRecord?['full_name'] ?? "User";
+        userEmail = userRecord?['email'] ?? "";
+      });
+    } catch (e) {
+      print("User fetch error: $e");
+    }
+  }
+
+  /// LOAD PRODUCTS (FILTERED BY USER)
   Future<void> loadProducts() async {
     if (!mounted) return;
 
     setState(() => _isLoading = true);
 
     try {
-      final products = await _productService.getAllProducts2();
+      final db = await _productService.localDb.database;
+
+      final result = await db.query(
+        "products",
+        where: "user_id = ?",
+        whereArgs: [currentUserId],
+      );
+
+      final products = result.map((e) => Productclass.fromMap(e)).toList();
 
       if (!mounted) return;
 
@@ -62,20 +111,17 @@ class _ProductviewState extends State<Productview> with WidgetsBindingObserver {
         _filteredProducts = List.from(products);
       });
 
-      filterByStock(); // apply current stock filter
+      filterByStock();
     } catch (e) {
       print("Load error: $e");
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Failed to load products: $e")),
-        );
-      }
     }
 
-    if (mounted) setState(() => _isLoading = false);
+    if (mounted) {
+      setState(() => _isLoading = false);
+    }
   }
 
-  /// ---------------- SEARCH FILTER ----------------
+  /// SEARCH
   void filterSearch(String query) {
     List<Productclass> filtered = _products.where((p) {
       return p.name.toLowerCase().contains(query.toLowerCase());
@@ -85,63 +131,42 @@ class _ProductviewState extends State<Productview> with WidgetsBindingObserver {
       _filteredProducts = filtered;
     });
 
-    filterByStock(); // apply stock filter on top
+    filterByStock();
   }
 
-  /// ---------------- STOCK FILTER ----------------
+  /// STOCK FILTER
   void filterByStock() {
     List<Productclass> filtered = List.from(_filteredProducts);
 
     if (_stockFilter == "Low") {
-      filtered = filtered.where((p) => p.stock <= 5).toList(); // low stock
+      filtered = filtered.where((p) => p.stock <= 5).toList();
     } else if (_stockFilter == "High") {
-      filtered = filtered.where((p) => p.stock >= 50).toList(); // high stock
+      filtered = filtered.where((p) => p.stock >= 50).toList();
     }
+
+    filtered.sort((a, b) => a.name.compareTo(b.name));
 
     setState(() {
       _filteredProducts = filtered;
     });
-
-    sortProductsAlphabetically();
   }
 
-  /// ---------------- SORT ALPHABETICALLY ----------------
-  void sortProductsAlphabetically() {
-    _filteredProducts.sort((a, b) {
-      String firstWordA = a.name.split(' ').first.toLowerCase();
-      String firstWordB = b.name.split(' ').first.toLowerCase();
-      return firstWordA.compareTo(firstWordB);
-    });
-    setState(() {});
-  }
-
-  /// ---------------- DELETE PRODUCT ----------------
+  /// DELETE
   Future<void> deleteProduct(Productclass product) async {
-    if (isGuest) return; // guest cannot delete
-
     try {
       final db = await _productService.localDb.database;
 
-      // Delete locally first
       await db.delete(
         "products",
-        where: "client_uuid = ?",
-        whereArgs: [product.productClientUuid],
+        where: "client_uuid = ? AND user_id = ?",
+        whereArgs: [product.productClientUuid, currentUserId],
       );
 
-      // Delete from Supabase
-      if (product.productClientUuid.isNotEmpty) {
-        await _productService.supabase
-            .from("products")
-            .delete()
-            .eq("client_uuid", product.productClientUuid);
-      }
-
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("Product deleted")));
+      await _productService.supabase
+          .from("products")
+          .delete()
+          .eq("client_uuid", product.productClientUuid)
+          .eq("user_id", currentUserId);
 
       loadProducts();
     } catch (e) {
@@ -149,7 +174,7 @@ class _ProductviewState extends State<Productview> with WidgetsBindingObserver {
     }
   }
 
-  /// ---------------- UPDATE LOCAL PRODUCT ----------------
+  /// UPDATE LOCAL
   void updateLocalProduct(Productclass updatedProduct) {
     final index = _products.indexWhere((p) => p.id == updatedProduct.id);
 
@@ -158,19 +183,18 @@ class _ProductviewState extends State<Productview> with WidgetsBindingObserver {
         _products[index] = updatedProduct;
         _filteredProducts = List.from(_products);
       });
-      filterByStock(); // apply current stock filter
+
+      filterByStock();
     }
   }
 
-  /// ---------------- UI ----------------
+  /// UI
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        automaticallyImplyLeading: false,
         title: const Text("Products"),
         actions: [
-          Text('sort'),
           PopupMenuButton<String>(
             icon: const Icon(Icons.filter_alt),
             onSelected: (value) {
@@ -189,7 +213,6 @@ class _ProductviewState extends State<Productview> with WidgetsBindingObserver {
           ? const Center(child: CircularProgressIndicator())
           : Column(
               children: [
-                // Search Box
                 Padding(
                   padding: const EdgeInsets.all(12),
                   child: TextField(
@@ -204,8 +227,6 @@ class _ProductviewState extends State<Productview> with WidgetsBindingObserver {
                     ),
                   ),
                 ),
-
-                // Product List
                 Expanded(
                   child: _filteredProducts.isEmpty
                       ? const Center(child: Text("No products found"))
@@ -217,132 +238,46 @@ class _ProductviewState extends State<Productview> with WidgetsBindingObserver {
                             itemBuilder: (context, index) {
                               final product = _filteredProducts[index];
 
-                              return Dismissible(
-                                key: Key(product.productClientUuid),
-                                direction: DismissDirection.endToStart,
-                                confirmDismiss: (_) async {
-                                  if (isGuest) return false;
-                                  return await showDialog(
-                                    context: context,
-                                    builder: (_) => AlertDialog(
-                                      title: const Text("Delete Product"),
-                                      content: const Text(
-                                          "Delete this product permanently?"),
-                                      actions: [
-                                        TextButton(
-                                          onPressed: () =>
-                                              Navigator.pop(context, false),
-                                          child: const Text("Cancel"),
+                              return Card(
+                                margin: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 6),
+                                child: ListTile(
+                                  title: Text(product.name),
+                                  subtitle: Text(
+                                      "Cost ₱${product.costPrice} | Retail ₱${product.retailPrice}"),
+                                  trailing: Text("Stock ${product.stock}"),
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => AddProductPage(
+                                          product: product,
+                                          userId: currentUserId,
                                         ),
-                                        TextButton(
-                                          onPressed: () =>
-                                              Navigator.pop(context, true),
-                                          child: const Text(
-                                            "Delete",
-                                            style: TextStyle(color: Colors.red),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  );
-                                },
-                                onDismissed: (_) async {
-                                  setState(() {
-                                    _filteredProducts.removeAt(index);
-                                  });
-                                  await deleteProduct(product);
-                                },
-                                background: Container(
-                                  alignment: Alignment.centerRight,
-                                  padding: const EdgeInsets.only(right: 20),
-                                  color: Colors.red,
-                                  child: const Icon(
-                                    Icons.delete,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                                child: Card(
-                                  margin: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 6,
-                                  ),
-                                  child: ListTile(
-                                    title: Text(product.name.toUpperCase()),
-                                    subtitle: Text(
-                                      "Cost: ₱${product.costPrice.toStringAsFixed(2)}\n"
-                                      "Retail: ₱${product.retailPrice.toStringAsFixed(2)}",
-                                    ),
-                                    trailing: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Column(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.center,
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.end,
-                                          children: [
-                                            Text(
-                                              "Stock: ${product.stock}",
-                                              style: const TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                            if (product.isPromo)
-                                              const Text(
-                                                "PROMO",
-                                                style: TextStyle(
-                                                  color: Colors.red,
-                                                  fontSize: 12,
-                                                ),
-                                              ),
-                                          ],
-                                        ),
-                                        const SizedBox(width: 8),
-                                        if (!isGuest)
-                                          IconButton(
-                                            icon: const Icon(
-                                              Icons.edit,
-                                              color: Colors.blue,
-                                            ),
-                                            onPressed: () {
-                                              Navigator.push(
-                                                context,
-                                                MaterialPageRoute(
-                                                  builder: (_) =>
-                                                      AddProductPage(
-                                                    product: product,
-                                                  ),
-                                                ),
-                                              ).then((result) {
-                                                if (result != null &&
-                                                    result is Productclass) {
-                                                  updateLocalProduct(result);
-                                                }
-                                              });
-                                            },
-                                          ),
-                                      ],
-                                    ),
-                                  ),
+                                      ),
+                                    ).then((_) => loadProducts());
+                                  },
                                 ),
                               );
                             },
                           ),
                         ),
-                ),
+                )
               ],
             ),
-      floatingActionButton: isGuest
-          ? null
-          : FloatingActionButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const AddProductPage()),
-                ).then((_) => loadProducts());
-              },
-              child: const Icon(Icons.add),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => AddProductPage(
+                userId: currentUserId,
+              ),
             ),
+          ).then((_) => loadProducts());
+        },
+        child: const Icon(Icons.add),
+      ),
     );
   }
 }

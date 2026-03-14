@@ -13,6 +13,7 @@ class Productclass {
   final String type; // 'add', 'update', 'delete' for sync
   final String productClientUuid;
   final int lowStock;
+  String? userid;
 
   Productclass({
     required this.id,
@@ -27,6 +28,7 @@ class Productclass {
     this.otherQty = 0, // default 0
     this.type = 'add',
     this.lowStock = 0, // default 0
+    this.userid,
   });
 
   // Convert to Map for Supabase insert/update
@@ -44,6 +46,7 @@ class Productclass {
       'client_uuid': productClientUuid,
       'type': type,
       'low_stock_threshold': lowStock, // ✅ Add low stock threshold
+      'user_id': userid,
     };
   }
 
@@ -62,6 +65,7 @@ class Productclass {
       type: map['type'] ?? 'add',
       byPieces: int.tryParse(map['by_pieces'].toString()) ?? 0,
       lowStock: map['low_stock_threshold'] ?? 0, // ✅ Add low stock threshold
+      userid: map['user_id'],
     );
   }
 

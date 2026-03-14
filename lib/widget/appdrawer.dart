@@ -5,6 +5,7 @@ import 'package:cashier/view/stock_screnn.dart';
 import 'package:cashier/view/transaction_history.dart';
 import 'package:cashier/widget/addproduct.dart';
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class Appdrawer extends StatefulWidget {
   const Appdrawer({super.key});
@@ -43,7 +44,7 @@ class _AppdrawerState extends State<Appdrawer> {
                                 // 🔥 Navigate back to USER MODE
                                 Navigator.pushReplacement(
                                   context,
-                                  MaterialPageRoute(builder: (_) => AddProductPage()),
+                                  MaterialPageRoute(builder: (_) => AddProductPage(userId: Supabase.instance.client.auth.currentUser!.id,)),
                                 );
                               },
                               child: Text('User'),
@@ -55,7 +56,7 @@ class _AppdrawerState extends State<Appdrawer> {
                                 // 🔥 Navigate back to USER MODE
                                 Navigator.pushReplacement(
                                   context,
-                                  MaterialPageRoute(builder: (_) => AddProductPage()),
+                                  MaterialPageRoute(builder: (_) => AddProductPage(userId: Supabase.instance.client.auth.currentUser!.id,)),
                                 );
                               },
                               child: Text('User'),

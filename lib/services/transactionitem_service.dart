@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:cashier/database/local_db.dart';
 import 'package:cashier/database/supabase.dart';
 import 'package:cashier/class/product_offline.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class TransactionItemService {
   final localDb = LocalDatabase();
@@ -19,6 +20,7 @@ class TransactionItemService {
 
   // ------------------- INSERT TRANSACTION OFFLINE -------------------
   Future<int> insertTransactionItemOffline({
+    required String userId,
     required double total,
     required double cash,
     required double change,
@@ -28,6 +30,7 @@ class TransactionItemService {
 
     // Insert transaction header
     final transactionId = await db.insert('transactions', {
+      'user_id': Supabase.instance.client.auth.currentUser?.id,
       'total': total,
       'cash': cash,
       'change': change,
@@ -38,6 +41,7 @@ class TransactionItemService {
     // Insert transaction items
     for (var item in items) {
       await db.insert('transaction_items', {
+        'user_id': Supabase.instance.client.auth.currentUser?.id,
         'transaction_id': transactionId,
         'product_id': item.productId,
         'product_name': item.productName,
@@ -47,7 +51,8 @@ class TransactionItemService {
         'is_promo': item.isPromo ? 1 : 0,
         'other_qty': item.otherQty,
         'is_synced': 0,
-        'product_client_uuid': item.productClientUuid
+        'product_client_uuid': item.productClientUuid,
+        'user_id':item.userId,
       });
     }
 

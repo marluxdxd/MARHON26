@@ -3,12 +3,20 @@ import 'package:cashier/services/barcode_scan_service.dart';
 import 'package:cashier/services/product_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/svg.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AddProductPage extends StatefulWidget {
   final Productclass? product; // existing product for edit
   final String? barcode; // scanned barcode
 
-  const AddProductPage({super.key, this.product, this.barcode});
+AddProductPage({
+    super.key,
+    this.product,
+    this.barcode,
+    required String userId,
+  });
+  
+  String? userId = Supabase.instance.client.auth.currentUser!.id;
 
   @override
   State<AddProductPage> createState() => _AddProductPageState();
@@ -16,6 +24,7 @@ class AddProductPage extends StatefulWidget {
 
 class _AddProductPageState extends State<AddProductPage>
     with SingleTickerProviderStateMixin {
+       String userId =   Supabase.instance.client.auth.currentUser!.id;
   double pricePerPiece = 0;
   double priceInterest = 0;
   final lowStockController = TextEditingController();
@@ -37,39 +46,41 @@ class _AddProductPageState extends State<AddProductPage>
   late Animation<double> _priceAnim;
 
 
-Future<void> debugLowStock() async {
-  final db = await productService.localDb.database;
 
-  final result = await db.rawQuery('''
+  Future<void> debugLowStock() async {
+    final db = await productService.localDb.database;
+
+    final result = await db.rawQuery('''
     SELECT *
     FROM products
     WHERE low_stock_threshold = 0
   ''');
 
-  print("LOW STOCK = 0 PRODUCTS:");
-  print(result);
-}
-
-Future<void> debugProducts() async {
-  final db = await productService.localDb.database;
-
-  final result = await db.rawQuery(
-      'SELECT id, name, stock, low_stock_threshold FROM products');
-
-  print("📦 PRODUCTS TABLE:");
-  for (var row in result) {
-    print(row);
+    print("LOW STOCK = 0 PRODUCTS:");
+    print(result);
   }
-}
 
+  Future<void> debugProducts() async {
+    final db = await productService.localDb.database;
 
+    final result = await db.rawQuery(
+      'SELECT id, name, stock, low_stock_threshold FROM products',
+    );
+
+    print("📦 PRODUCTS TABLE:");
+    for (var row in result) {
+      print(row);
+    }
+  }
 
   @override
   void initState() {
     super.initState();
-debugLowStock();
-    _animController =
-        AnimationController(vsync: this, duration: const Duration(milliseconds: 400));
+    debugLowStock();
+    _animController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 400),
+    );
     _priceAnim = Tween<double>(begin: 0, end: 0).animate(_animController);
 
     // Add mode defaults
@@ -107,120 +118,104 @@ debugLowStock();
   /// ===============================
   /// SAVE PRODUCT
   /// ===============================
-  void saveProduct() async {
-    
-    final name = nameController.text.trim();
-    final barcode = barcodeController.text.trim();
-    final stock = widget.product == null
-    ? int.tryParse(stockController.text) ?? 0
-    : widget.product!.stock;
-    final lowStock = int.tryParse(lowStockController.text) ?? 0;
-    final costPrice = double.tryParse(costPriceController.text) ?? 0;
-    final retailPrice = double.tryParse(retailPriceController.text) ?? 0;
-    final byPieces = int.tryParse(byPiecesController.text) ?? 1;
-    otherQty = int.tryParse(promoQtyController.text) ?? 0;
+ void saveProduct() async {
+  final name = nameController.text.trim();
+  final barcode = barcodeController.text.trim();
+  final stock = widget.product == null
+      ? int.tryParse(stockController.text) ?? 0
+      : widget.product!.stock;
+  final lowStock = int.tryParse(lowStockController.text) ?? 0;
+  final costPrice = double.tryParse(costPriceController.text) ?? 0;
+  final retailPrice = double.tryParse(retailPriceController.text) ?? 0;
+  final byPieces = int.tryParse(byPiecesController.text) ?? 1;
+  otherQty = int.tryParse(promoQtyController.text) ?? 0;
 
-    if (name.isEmpty) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text("Enter product name")));
-      return;
-    }
-
-    setState(() => isLoading = true);
-
-    try {
-      final online = await productService.isOnline1();
-
-      if (widget.product == null) {
-        // CREATE MODE
-        await productService.insertProductOffline(
-          name: name,
-          barcode: barcode,
-          stock: stock,
-          costPrice: costPrice,
-          retailPrice: retailPrice,
-          byPieces: byPieces,
-          isPromo: isPromo,
-          otherQty: otherQty,
-          lowStock: lowStock,
-        );
-      } else {
-        // UPDATE MODE
-        final clientUuid = widget.product!.productClientUuid;
-        final db = await productService.localDb.database;
-
-        await db.update(
-          "products",
-          {
-            "name": name,
-            "barcode": barcode,
-            "cost_price": costPrice,
-            "low_stock_threshold": lowStock,
-            "retail_price": retailPrice,
-            "by_pieces": byPieces,
-            "is_promo": isPromo ? 1 : 0,
-            "other_qty": otherQty,
-            "is_synced": 0,
-          },
-          where: "client_uuid = ?",
-          whereArgs: [clientUuid],
-        );
-
-        BarcodeScanService.updateProductCache(
-          Productclass(
-            id: widget.product!.id,
-            productClientUuid: widget.product!.productClientUuid,
-            name: name,
-            barcode: barcode,
-             stock: widget.product!.stock,
-              lowStock: lowStock,
-            costPrice: costPrice,
-            retailPrice: retailPrice,
-            byPieces: byPieces,
-            isPromo: isPromo,
-            otherQty: otherQty,
-          ),
-        );
-
-        if (await productService.isOnline2()) {
-          await productService.syncSingleProductOnline(widget.product!.id);
-        }
-      }
-
-      if (online) {
-        productService.notifyProductChanged();
-        await productService.syncOnlineProducts();
-        final products = await productService.getAllProducts();
-        BarcodeScanService.buildBarcodeCache(products);
-      }
-
-      final products = await productService.getProducts();
-      BarcodeScanService.buildBarcodeCache(products);
-
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            widget.product == null
-                ? "Product added successfully"
-                : "Product updated successfully",
-          ),
-        ),
-      );
-
-      if (mounted) Navigator.pop(context);
-    } catch (e) {
-      debugPrint("SAVE PRODUCT ERROR: $e");
-    }
-
-    if (mounted) setState(() => isLoading = false);
+  if (name.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("Enter product name")),
+    );
+    return;
   }
 
+  setState(() => isLoading = true);
+
+  try {
+    final online = await productService.isOnline1();
+
+    if (widget.product == null) {
+      // CREATE MODE
+      final newProductId = await productService.insertProductOffline(
+        name: name,
+        barcode: barcode,
+        stock: stock,
+        costPrice: costPrice,
+        retailPrice: retailPrice,
+        byPieces: byPieces,
+        isPromo: isPromo,
+        otherQty: otherQty,
+        lowStock: lowStock,
+        userid: Supabase.instance.client.auth.currentUser!.id,
+      );
+
+      // 🔹 Add online sync for new products
+      if (online) {
+        await productService.syncSingleProductOnline(newProductId);
+      }
+    } else {
+      // UPDATE MODE
+      final clientUuid = widget.product!.productClientUuid;
+      final db = await productService.localDb.database;
+
+      await db.update(
+        "products",
+        {
+          "name": name,
+          "barcode": barcode,
+          "cost_price": costPrice,
+          "low_stock_threshold": lowStock,
+          "retail_price": retailPrice,
+          "by_pieces": byPieces,
+          "is_promo": isPromo ? 1 : 0,
+          "other_qty": otherQty,
+          "is_synced": 0,
+          "user_id": userId,
+        },
+        where: "client_uuid = ?",
+        whereArgs: [clientUuid],
+      );
+
+      if (online) {
+        await productService.syncSingleProductOnline(widget.product!.id);
+      }
+    }
+
+    // Refresh local cache
+    final products = await productService.getProducts();
+    BarcodeScanService.buildBarcodeCache(products);
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          widget.product == null
+              ? "Product added successfully"
+              : "Product updated successfully",
+        ),
+      ),
+    );
+
+    if (mounted) Navigator.pop(context);
+  } catch (e) {
+    debugPrint("SAVE PRODUCT ERROR: $e");
+  }
+
+  if (mounted) setState(() => isLoading = false);
+}
   /// ===============================
   /// CALCULATIONS
   /// ===============================
-   void computePricePerPiece() {
+  void computePricePerPiece() {
     final costPrice = double.tryParse(costPriceController.text) ?? 0;
     final pieces = int.tryParse(byPiecesController.text) ?? 1;
 
@@ -240,9 +235,10 @@ debugLowStock();
   }
 
   void _animatePrice(double oldValue, double newValue) {
-    _priceAnim = Tween<double>(begin: oldValue, end: newValue).animate(
-      CurvedAnimation(parent: _animController, curve: Curves.easeOut),
-    );
+    _priceAnim = Tween<double>(
+      begin: oldValue,
+      end: newValue,
+    ).animate(CurvedAnimation(parent: _animController, curve: Curves.easeOut));
     _animController.forward(from: 0);
   }
 
@@ -300,7 +296,10 @@ debugLowStock();
         elevation: 0,
         title: Text(
           isEdit ? "Edit Product" : "Add Product",
-          style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+          style: const TextStyle(
+            color: Colors.black,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         iconTheme: const IconThemeData(color: Colors.black),
       ),
@@ -311,7 +310,10 @@ debugLowStock();
             CheckboxListTile(
               title: const Text(
                 "Promo",
-                style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  color: Colors.black87,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               value: isPromo,
               activeColor: Colors.blueAccent,
@@ -319,24 +321,24 @@ debugLowStock();
             ),
 
             buildGradientCard(
-  child: TextField(
-    controller: barcodeController,
-    readOnly: widget.barcode != null,
-    style: const TextStyle(color: Colors.black),
-    decoration: InputDecoration(
-      labelText: "Barcode",
-      prefixIcon: Padding(
-        padding: const EdgeInsets.all(1),
-        child: SvgPicture.asset(
-          "assets/icons/Barcode.svg",
-          width: 20,
-          height: 30,
-        ),
-      ),
-      border: OutlineInputBorder(),
-    ),
-  ),
-),
+              child: TextField(
+                controller: barcodeController,
+                readOnly: widget.barcode != null,
+                style: const TextStyle(color: Colors.black),
+                decoration: InputDecoration(
+                  labelText: "Barcode",
+                  prefixIcon: Padding(
+                    padding: const EdgeInsets.all(1),
+                    child: SvgPicture.asset(
+                      "assets/icons/Barcode.svg",
+                      width: 20,
+                      height: 30,
+                    ),
+                  ),
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ),
 
             if (isPromo)
               buildGradientCard(
@@ -344,7 +346,10 @@ debugLowStock();
                   controller: promoQtyController,
                   keyboardType: TextInputType.number,
                   style: const TextStyle(color: Colors.black),
-                  decoration: buildInputDecoration("Promo Qty", Icons.confirmation_number),
+                  decoration: buildInputDecoration(
+                    "Promo Qty",
+                    Icons.confirmation_number,
+                  ),
                 ),
               ),
 
@@ -371,8 +376,10 @@ debugLowStock();
                   controller: lowStockController,
                   keyboardType: TextInputType.number,
                   style: const TextStyle(color: Colors.black),
-                  decoration: buildInputDecoration("Low Stock", Icons.warning)
-                      .copyWith(hintText: "Optional"),
+                  decoration: buildInputDecoration(
+                    "Low Stock",
+                    Icons.warning,
+                  ).copyWith(hintText: "Optional"),
                 ),
               ),
             ),
@@ -384,7 +391,10 @@ debugLowStock();
                   keyboardType: TextInputType.number,
                   onChanged: (_) => computePricePerPiece(),
                   style: const TextStyle(color: Colors.black),
-                  decoration: buildInputDecoration("Cost Price", Icons.attach_money),
+                  decoration: buildInputDecoration(
+                    "Cost Price",
+                    Icons.attach_money,
+                  ),
                 ),
               ),
               right: buildGradientCard(
@@ -404,7 +414,10 @@ debugLowStock();
                 keyboardType: TextInputType.number,
                 onChanged: (_) => computeInterest(),
                 style: const TextStyle(color: Colors.black),
-                decoration: buildInputDecoration("Retail Price", Icons.price_check),
+                decoration: buildInputDecoration(
+                  "Retail Price",
+                  Icons.price_check,
+                ),
               ),
             ),
 
@@ -418,13 +431,17 @@ debugLowStock();
                   builder: (_, _) => Text(
                     "Price/pcs: ₱${pricePerPiece.toStringAsFixed(2)}",
                     style: const TextStyle(
-                        color: Colors.blueAccent, fontWeight: FontWeight.bold),
+                      color: Colors.blueAccent,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
                 Text(
                   "Interest: ₱${priceInterest.toStringAsFixed(2)}",
                   style: const TextStyle(
-                      color: Colors.green, fontWeight: FontWeight.bold),
+                    color: Colors.green,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ],
             ),
@@ -447,7 +464,9 @@ debugLowStock();
                     : Text(
                         isEdit ? "Update Product" : "Save Product",
                         style: const TextStyle(
-                            fontSize: 18, fontWeight: FontWeight.bold),
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
               ),
             ),

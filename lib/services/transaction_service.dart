@@ -162,6 +162,7 @@ Future<List<Map<String, dynamic>>> fetchAllTransactions({
       'change': change,
       'created_at': getPhilippineTimestamp(), // PHT timestamp
       'is_synced': 0,
+      'user_id': Supabase.instance.client.auth.currentUser?.id,
     });
 
     // 2️⃣ Save each transaction item
@@ -179,6 +180,7 @@ Future<List<Map<String, dynamic>>> fetchAllTransactions({
         'other_qty': item.otherQty,
         'is_synced': 0,
         'product_client_uuid': item.productClientUuid, // ✅ ADD THIS
+        'user_id': Supabase.instance.client.auth.currentUser?.id,
         
         
       });
@@ -219,6 +221,7 @@ Future<List<Map<String, dynamic>>> fetchAllTransactions({
             'change': trx['change'],
             'created_at': trx['created_at'],
             'client_uuid': trx['client_uuid'],
+            'user_id': Supabase.instance.client.auth.currentUser?.id,
           })
           .select()
           .single();
@@ -253,6 +256,7 @@ Future<List<Map<String, dynamic>>> fetchAllTransactions({
           'other_qty': item['other_qty'],
           'product_client_uuid': item['product_client_uuid'] ??
               generateUniqueId(prefix: 'P'),
+              'user_id': Supabase.instance.client.auth.currentUser?.id,
         }, onConflict: 'product_client_uuid, transaction_id, product_id'); // pass as string, not list
 
 
@@ -298,6 +302,7 @@ Future<int> saveTransaction({
   required double cash,
   required double change,
   required String clientUuid,
+  required String? userId,
 }) async {
   final response = await supabase
       .from('transactions')
@@ -307,6 +312,7 @@ Future<int> saveTransaction({
         'change': change,
         'client_uuid': clientUuid, // ✅ IMPORTANT
         'created_at': getPhilippineTimestamp(),
+        'user_id': Supabase.instance.client.auth.currentUser?.id,
       })
       .select('id')
       .single();
@@ -321,6 +327,7 @@ Future<int> saveTransaction({
     required int qty,
     required bool isPromo,
     required int otherQty,
+    required String userId,
   }) async {
       print(
     "🌐 ONLINE INSERT ITEM => ${product.name} uuid=${product.productClientUuid}",
@@ -335,6 +342,7 @@ Future<int> saveTransaction({
       'is_promo': isPromo,
       'other_qty': otherQty,
       'product_client_uuid': product.productClientUuid,
+      'user_id': Supabase.instance.client.auth.currentUser?.id,
     });
   }
 

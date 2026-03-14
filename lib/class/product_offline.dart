@@ -1,3 +1,5 @@
+import 'package:supabase_flutter/supabase_flutter.dart';
+
 class ProductOffline {
   final int id;
 
@@ -11,6 +13,7 @@ class ProductOffline {
 
   final bool isPromo;
   final int otherQty;
+  final String? userId;
 
   // For full transaction
   final double? total;
@@ -25,7 +28,7 @@ class ProductOffline {
     required this.id,
     required this.productId,
     this.productName,
-   
+   required this.userId,
     this.retailPrice,
     this.costPrice,
     this.qty,
@@ -54,6 +57,7 @@ class ProductOffline {
       'change': change,
       'timestamp': timestamp?.toIso8601String(),
       'product_client_uuid': productClientUuid, // ✅ add here
+      'user_id': Supabase.instance.client.auth.currentUser?.id,
     };
   }
 
@@ -72,6 +76,7 @@ class ProductOffline {
       change: (map['change'] as num?)?.toDouble(),
       timestamp: map['timestamp'] != null ? DateTime.parse(map['timestamp']) : null,
       productClientUuid: map['product_client_uuid'] ?? '', // ✅ ADD THIS
+      userId: map['user_id'],
     );
   }
 }

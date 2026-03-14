@@ -77,9 +77,7 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
       ),
-      home: initialRole != null
-          ? MainNav(role: initialRole!)
-          : const LoginScreen(),
+      home: LoginScreen(),
     );
   }
 }

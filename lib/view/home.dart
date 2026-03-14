@@ -19,6 +19,7 @@ import 'package:flutter/material.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:internet_connection_checker/internet_connection_checker.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:async';
 import 'package:uuid/uuid.dart';
 
@@ -278,6 +279,7 @@ class _HomeState extends State<Home> {
                           createdAt: timestamp,
                           isSynced: online ? 1 : 0,
                           clientUuid: clientUuid,
+                          userId: Supabase.instance.client.auth.currentUser?.id,
                         );
 
                     int? onlineTransactionId;
@@ -289,6 +291,7 @@ class _HomeState extends State<Home> {
                             cash: cash,
                             change: change,
                             clientUuid: clientUuid,
+                            userId:Supabase.instance.client.auth.currentUser?.id,
                           );
 
                       await localDb.updateTransactionSupabaseId(
@@ -303,6 +306,7 @@ class _HomeState extends State<Home> {
                     final futures = combinedItems.values.map((row) async {
                       final product = row.product!;
                       final qtySold = row.qty;
+                      final userId =  Supabase.instance.client.auth.currentUser?.id ?? '';
                       final promoCount = savedPromoCounts[product.id] ?? 0;
 
                       int? oldStock = await localDb.getProductStock(product.id);
@@ -324,6 +328,7 @@ class _HomeState extends State<Home> {
                               promoCount: promoCount,
                               retailPrice: product.retailPrice,
                               isSynced: online ? 1 : 0,
+                              userId:Supabase.instance.client.auth.currentUser?.id,
                             );
 
                             if (online && onlineTransactionId != null) {
@@ -333,6 +338,7 @@ class _HomeState extends State<Home> {
                                 productName: product.name,
                                 promoCount: promoCount,
                                 retailPrice: product.retailPrice,
+                                userId: Supabase.instance.client.auth.currentUser?.id,
                               );
                             }
                           }(),
@@ -348,6 +354,7 @@ class _HomeState extends State<Home> {
                           isPromo: product.isPromo,
                           otherQty: product.otherQty,
                           productClientUuid: product.productClientUuid,
+                          userId: Supabase.instance.client.auth.currentUser?.id,
                         ),
 
                         if (oldStock != null)
@@ -366,6 +373,8 @@ class _HomeState extends State<Home> {
                             createdAt: timestamp,
                             synced: online ? 1 : 0,
                             productClientUuid: product.productClientUuid,
+                            userId: Supabase.instance.client.auth.currentUser?.id,
+                            
                           ),
 
                         localDb.insertStockUpdateQueue1(
@@ -383,6 +392,7 @@ class _HomeState extends State<Home> {
                               qty: qtySold,
                               isPromo: product.isPromo,
                               otherQty: product.otherQty,
+                              userId: userId,
                             ),
                           ]),
                       ]);

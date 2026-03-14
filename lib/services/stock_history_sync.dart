@@ -1,5 +1,6 @@
 import 'package:cashier/database/local_db.dart';
 import 'package:cashier/database/supabase.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
 class StockHistorySyncService {
@@ -56,6 +57,7 @@ class StockHistorySyncService {
 
         final product = productList.first;
         final productName = product['name']?.toString() ?? 'UNKNOWN';
+        final userId = Supabase.instance.client.auth.currentUser?.id;
 
         // 4️⃣ Ensure product exists in Supabase
         final supaProduct = await supabase
@@ -78,6 +80,7 @@ class StockHistorySyncService {
                 'is_promo': product['is_promo'] == 1,
                 'other_qty': product['other_qty'] ?? 0,
                 'client_uuid': clientUuid,
+                'user_id':userId,
               })
               .select('id')
               .single();
@@ -97,6 +100,7 @@ class StockHistorySyncService {
           'trans_date': entry['trans_date']?.toString() ?? DateTime.now().toIso8601String(),
           'created_at': entry['created_at']?.toString() ?? DateTime.now().toIso8601String(),
           'product_client_uuid': clientUuid,
+          'user_id': userId,
         });
 
         print("✅ Synced to Supabase: stock_history_id=${entry['id']}, product_id=$supaProductId, qty_changed=${entry['qty_changed']}");

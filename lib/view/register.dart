@@ -1,29 +1,38 @@
-import 'package:cashier/view/register.dart';
-import 'package:cashier/widget/main_navigation.dart';
+import 'package:cashier/view/login.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:cashier/widget/main_navigation.dart';
 
 
-class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+class RegisterScreen extends StatefulWidget {
+  const RegisterScreen({super.key});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  State<RegisterScreen> createState() => _RegisterScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _RegisterScreenState extends State<RegisterScreen> {
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
+  final TextEditingController confirmController = TextEditingController();
   bool loading = false;
 
-  void login() async {
+  void register() async {
     String email = emailController.text.trim();
     String password = passwordController.text.trim();
+    String confirm = confirmController.text.trim();
 
-    if (email.isEmpty || password.isEmpty) {
+    if (email.isEmpty || password.isEmpty || confirm.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please enter email and password")),
+        const SnackBar(content: Text("Please fill all fields")),
+      );
+      return;
+    }
+
+    if (password != confirm) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Passwords do not match")),
       );
       return;
     }
@@ -31,12 +40,20 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => loading = true);
 
     try {
-      final response = await Supabase.instance.client.auth.signInWithPassword(
+      final response = await Supabase.instance.client.auth.signUp(
         email: email,
         password: password,
       );
 
       if (response.user != null) {
+        // Optional: Insert into profiles table
+        await Supabase.instance.client.from('profiles').insert({
+          'id': response.user!.id,
+          'email': email,
+          'role': 'user',
+        });
+
+        // Navigate to main screen
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
@@ -45,7 +62,7 @@ class _LoginScreenState extends State<LoginScreen> {
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Login failed")),
+          const SnackBar(content: Text("Registration failed")),
         );
       }
     } catch (e) {
@@ -63,18 +80,18 @@ class _LoginScreenState extends State<LoginScreen> {
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            colors: [Colors.white, Colors.white],
+            colors: [Colors.white10,Colors.white],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
         ),
         child: Center(
           child: SingleChildScrollView(
-         
+   
             child: Card(
-            
-      
-
+           
+              
+ 
               child: Padding(
                 padding: const EdgeInsets.all(10),
                 child: Column(
@@ -90,7 +107,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     const SizedBox(height: 25),
 
                     const Text(
-                      "Welcome Back",
+                      "Create Account",
                       style: TextStyle(
                         fontSize: 28,
                         fontWeight: FontWeight.bold,
@@ -101,7 +118,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     const SizedBox(height: 8),
 
                     const Text(
-                      "Login to your account",
+                      "Register to continue",
                       style: TextStyle(
                         fontSize: 16,
                         color: Colors.black54,
@@ -110,7 +127,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
                     const SizedBox(height: 30),
 
-                    // Email Field
+                    // Email
                     TextField(
                       controller: emailController,
                       keyboardType: TextInputType.emailAddress,
@@ -125,7 +142,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
                     const SizedBox(height: 20),
 
-                    // Password Field
+                    // Password
                     TextField(
                       controller: passwordController,
                       obscureText: true,
@@ -138,14 +155,29 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
 
+                    const SizedBox(height: 20),
+
+                    // Confirm Password
+                    TextField(
+                      controller: confirmController,
+                      obscureText: true,
+                      decoration: InputDecoration(
+                        labelText: "Confirm Password",
+                        prefixIcon: const Icon(Icons.lock_outline),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                      ),
+                    ),
+
                     const SizedBox(height: 35),
 
-                    // Login Button
+                    // Register Button
                     SizedBox(
                       width: double.infinity,
                       height: 55,
                       child: ElevatedButton(
-                        onPressed: loading ? null : login,
+                        onPressed: loading ? null : register,
                         style: ElevatedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 1),
                           shape: RoundedRectangleBorder(
@@ -157,7 +189,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         child: Ink(
                           decoration: BoxDecoration(
                             gradient: const LinearGradient(
-                              colors: [Colors.blue, Color(0xFF2575FC)],
+                                colors: [Colors.blue, Color(0xFF2575FC)],
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
                             ),
@@ -166,9 +198,11 @@ class _LoginScreenState extends State<LoginScreen> {
                           child: Container(
                             alignment: Alignment.center,
                             child: loading
-                                ? const CircularProgressIndicator(color: Colors.white)
+                                ? const CircularProgressIndicator(
+                                    color: Colors.white,
+                                  )
                                 : const Text(
-                                    "Login",
+                                    "Register",
                                     style: TextStyle(
                                       fontSize: 18,
                                       fontWeight: FontWeight.bold,
@@ -181,23 +215,17 @@ class _LoginScreenState extends State<LoginScreen> {
 
                     const SizedBox(height: 15),
 
-                    // Register Button
+                    // Navigate to Login
                     TextButton(
                       onPressed: () {
-                        Navigator.push(
+                        Navigator.pushReplacement(
                           context,
                           MaterialPageRoute(
-                            builder: (_) => const RegisterScreen(),
+                            builder: (_) => const LoginScreen(),
                           ),
                         );
                       },
-                      child: const Text(
-                        "Don't have an account? Register now",
-                        style: TextStyle(
-                          color: Colors.blueAccent,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+                      child: const Text("Already have an account? Login"),
                     ),
                   ],
                 ),

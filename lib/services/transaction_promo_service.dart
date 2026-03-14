@@ -10,6 +10,7 @@ class TransactionPromoService {
     required String productName,
     required int promoCount,
     required double retailPrice,
+    required String? userId,
   }) async {
     final total = retailPrice * promoCount;
 
@@ -20,6 +21,7 @@ class TransactionPromoService {
       'promo_count': promoCount,
       'retail_price': retailPrice,
       'total': total,
+      'user_id': Supabase.instance.client.auth.currentUser?.id,
     });
 
     print('✅ Promo inserted online | productId: $productId count: $promoCount');
@@ -43,6 +45,7 @@ class TransactionPromoService {
           'promo_count': promo['promo_count'],
           'retail_price': promo['retail_price'],
           'total': promo['total'],
+          'user_id': Supabase.instance.client.auth.currentUser?.id,
         });
 
         await database.update(
