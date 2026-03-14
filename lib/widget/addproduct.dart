@@ -8,15 +8,16 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 class AddProductPage extends StatefulWidget {
   final Productclass? product; // existing product for edit
   final String? barcode; // scanned barcode
+  final String userId;
 
 AddProductPage({
     super.key,
     this.product,
     this.barcode,
-    required String userId,
+    required this.userId,
   });
   
-  String? userId = Supabase.instance.client.auth.currentUser!.id;
+
 
   @override
   State<AddProductPage> createState() => _AddProductPageState();
@@ -294,11 +295,12 @@ class _AddProductPageState extends State<AddProductPage>
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
+        centerTitle:true,
         title: Text(
           isEdit ? "Edit Product" : "Add Product",
           style: const TextStyle(
             color: Colors.black,
-            fontWeight: FontWeight.bold,
+          
           ),
         ),
         iconTheme: const IconThemeData(color: Colors.black),
@@ -457,7 +459,7 @@ class _AddProductPageState extends State<AddProductPage>
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  backgroundColor: Colors.blueAccent,
+                  backgroundColor: Colors.blue,
                 ),
                 child: isLoading
                     ? const CircularProgressIndicator(color: Colors.white)

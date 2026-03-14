@@ -1,5 +1,6 @@
 import 'package:cashier/database/local_db.dart';
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../class/productclass.dart';
 import '../class/posrowclass.dart';
 import '../widget/productbottomsheet.dart';
@@ -145,8 +146,8 @@ Future<Productclass?> _findProductByBarcode(String barcode) async {
 
   final result = await db.query(
     'products',
-    where: 'barcode = ?',
-    whereArgs: [barcode],
+    where: 'barcode = ? AND user_id = ?',
+    whereArgs: [barcode, Supabase.instance.client.auth.currentUser!.id],
   );
 
   print("SCAN BARCODE: $barcode");

@@ -291,7 +291,8 @@ class _HomeState extends State<Home> {
                             cash: cash,
                             change: change,
                             clientUuid: clientUuid,
-                            userId:Supabase.instance.client.auth.currentUser?.id,
+                            userId:
+                                Supabase.instance.client.auth.currentUser?.id,
                           );
 
                       await localDb.updateTransactionSupabaseId(
@@ -306,7 +307,8 @@ class _HomeState extends State<Home> {
                     final futures = combinedItems.values.map((row) async {
                       final product = row.product!;
                       final qtySold = row.qty;
-                      final userId =  Supabase.instance.client.auth.currentUser?.id ?? '';
+                      final userId =
+                          Supabase.instance.client.auth.currentUser?.id ?? '';
                       final promoCount = savedPromoCounts[product.id] ?? 0;
 
                       int? oldStock = await localDb.getProductStock(product.id);
@@ -328,7 +330,8 @@ class _HomeState extends State<Home> {
                               promoCount: promoCount,
                               retailPrice: product.retailPrice,
                               isSynced: online ? 1 : 0,
-                              userId:Supabase.instance.client.auth.currentUser?.id,
+                              userId:
+                                  Supabase.instance.client.auth.currentUser?.id,
                             );
 
                             if (online && onlineTransactionId != null) {
@@ -338,7 +341,12 @@ class _HomeState extends State<Home> {
                                 productName: product.name,
                                 promoCount: promoCount,
                                 retailPrice: product.retailPrice,
-                                userId: Supabase.instance.client.auth.currentUser?.id,
+                                userId: Supabase
+                                    .instance
+                                    .client
+                                    .auth
+                                    .currentUser
+                                    ?.id,
                               );
                             }
                           }(),
@@ -373,8 +381,8 @@ class _HomeState extends State<Home> {
                             createdAt: timestamp,
                             synced: online ? 1 : 0,
                             productClientUuid: product.productClientUuid,
-                            userId: Supabase.instance.client.auth.currentUser?.id,
-                            
+                            userId:
+                                Supabase.instance.client.auth.currentUser?.id,
                           ),
 
                         localDb.insertStockUpdateQueue1(
@@ -432,43 +440,53 @@ class _HomeState extends State<Home> {
       backgroundColor: Colors.white,
 
       appBar: AppBar(
-        automaticallyImplyLeading: false,
-        backgroundColor: Colors.white,
-        elevation: 0,
-        centerTitle: false,
-
-        title:   Row(
-    mainAxisSize: MainAxisSize.min, // dili mo-occupy full width
-     children: [
-      SvgPicture.asset(
-        'assets/icons/mh.svg', 
-        width: 50,
-        height: 50,
+    automaticallyImplyLeading: false,
+    backgroundColor: Colors.white,
+    elevation: 0,
+    centerTitle: false,
+    title: Row(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        // SVG Logo
+        SvgPicture.asset(
+          'assets/icons/logo4.svg',
+          width: 50,
+          height: 50,
+        ),
+   
+        const Text(
+          "SukiBarato",
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+            color: Colors.black87,
+            letterSpacing: -1,
       
-      ),
-      
-      ],
-  ),
-
-        actions: [
-          Stack(
-            children: [
-              AnimatedNotificationIcon(
-                notificationCount: notificationCount,
-                onPressed: () async {
-                  await Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const NotificationsPage(),
-                    ),
-                  );
-                  loadNotificationCount();
-                },
-              ),
-            ],
+          ),
+           ),
+              ],
+         ),
+         actions: [
+           Stack(
+              children: [
+          AnimatedNotificationIcon(
+            notificationCount: notificationCount,
+            onPressed: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const NotificationsPage(),
+                ),
+              );
+              loadNotificationCount();
+            },
           ),
         ],
       ),
+      const SizedBox(width: 10),
+    ],
+  ),
 
       body: _buildMainContent(),
     );

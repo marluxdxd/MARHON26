@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:cashier/widget/addproduct.dart';
 import 'package:cashier/class/productclass.dart';
@@ -15,46 +16,42 @@ class _ProductviewState extends State<Productview> with WidgetsBindingObserver {
   final ProductService _productService = ProductService();
 
   final ScrollController _scrollController = ScrollController();
-  final searchController = TextEditingController();
+  final TextEditingController searchController = TextEditingController();
 
   List<Productclass> _products = [];
   List<Productclass> _filteredProducts = [];
 
   bool _isLoading = true;
-
   String _stockFilter = "All";
-
-  bool? isGuest;
-  String userName = "User";
-  String userEmail = "";
+  String _searchQuery = "";
 
   late String currentUserId;
+
+  RealtimeChannel? _productChannel;
 
   @override
   void initState() {
     super.initState();
-
     WidgetsBinding.instance.addObserver(this);
 
     final user = Supabase.instance.client.auth.currentUser;
-
     if (user != null) {
       currentUserId = user.id;
     }
 
-    fetchUserRole();
+    _setupRealtimeProducts();
     loadProducts();
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _productChannel?.unsubscribe();
     _scrollController.dispose();
     searchController.dispose();
     super.dispose();
   }
 
-  /// APP RESUME REFRESH
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
@@ -62,40 +59,33 @@ class _ProductviewState extends State<Productview> with WidgetsBindingObserver {
     }
   }
 
-  /// USER PROFILE
-  Future<void> fetchUserRole() async {
-    final currentUser = Supabase.instance.client.auth.currentUser;
+  /// REALTIME LISTENER
+  void _setupRealtimeProducts() {
+    final supabase = Supabase.instance.client;
 
-    if (currentUser == null) {
-      setState(() => isGuest = true);
-      return;
-    }
+    _productChannel = supabase.channel('products_changes');
 
-    try {
-      final userRecord = await Supabase.instance.client
-          .from('profiles')
-          .select('full_name,email')
-          .eq('id', currentUser.id)
-          .maybeSingle();
-
-      setState(() {
-        userName = userRecord?['full_name'] ?? "User";
-        userEmail = userRecord?['email'] ?? "";
-      });
-    } catch (e) {
-      print("User fetch error: $e");
-    }
+    _productChannel!
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'products',
+          callback: (payload) {
+            loadProducts();
+          },
+        )
+        .subscribe();
   }
 
-  /// LOAD PRODUCTS (FILTERED BY USER)
+  /// LOAD PRODUCTS
   Future<void> loadProducts() async {
     if (!mounted) return;
-
     setState(() => _isLoading = true);
 
     try {
-      final db = await _productService.localDb.database;
+      await _productService.syncOnlineProducts();
 
+      final db = await _productService.localDb.database;
       final result = await db.query(
         "products",
         where: "user_id = ?",
@@ -108,42 +98,37 @@ class _ProductviewState extends State<Productview> with WidgetsBindingObserver {
 
       setState(() {
         _products = products;
-        _filteredProducts = List.from(products);
       });
 
-      filterByStock();
+      _applyFilters(); // always apply filters after loading
     } catch (e) {
-      print("Load error: $e");
+      debugPrint("Load error: $e");
     }
 
-    if (mounted) {
-      setState(() => _isLoading = false);
+    if (mounted) setState(() => _isLoading = false);
+  }
+
+  /// APPLY SEARCH + STOCK FILTER
+  void _applyFilters() {
+    List<Productclass> filtered = List.from(_products);
+
+    // Apply search
+    if (_searchQuery.isNotEmpty) {
+      filtered = filtered
+          .where(
+            (p) => p.name.toLowerCase().contains(_searchQuery.toLowerCase()),
+          )
+          .toList();
     }
-  }
 
-  /// SEARCH
-  void filterSearch(String query) {
-    List<Productclass> filtered = _products.where((p) {
-      return p.name.toLowerCase().contains(query.toLowerCase());
-    }).toList();
-
-    setState(() {
-      _filteredProducts = filtered;
-    });
-
-    filterByStock();
-  }
-
-  /// STOCK FILTER
-  void filterByStock() {
-    List<Productclass> filtered = List.from(_filteredProducts);
-
+    // Apply stock filter
     if (_stockFilter == "Low") {
       filtered = filtered.where((p) => p.stock <= 5).toList();
     } else if (_stockFilter == "High") {
       filtered = filtered.where((p) => p.stock >= 50).toList();
     }
 
+    // Sort alphabetically
     filtered.sort((a, b) => a.name.compareTo(b.name));
 
     setState(() {
@@ -151,132 +136,295 @@ class _ProductviewState extends State<Productview> with WidgetsBindingObserver {
     });
   }
 
-  /// DELETE
-  Future<void> deleteProduct(Productclass product) async {
-    try {
-      final db = await _productService.localDb.database;
-
-      await db.delete(
-        "products",
-        where: "client_uuid = ? AND user_id = ?",
-        whereArgs: [product.productClientUuid, currentUserId],
-      );
-
-      await _productService.supabase
-          .from("products")
-          .delete()
-          .eq("client_uuid", product.productClientUuid)
-          .eq("user_id", currentUserId);
-
-      loadProducts();
-    } catch (e) {
-      print("Delete error: $e");
-    }
+  /// SEARCH
+  void filterSearch(String query) {
+    _searchQuery = query;
+    _applyFilters();
   }
 
-  /// UPDATE LOCAL
-  void updateLocalProduct(Productclass updatedProduct) {
-    final index = _products.indexWhere((p) => p.id == updatedProduct.id);
+  /// STOCK FILTER
+  void filterByStock(String stock) {
+    _stockFilter = stock;
+    _applyFilters();
+  }
 
-    if (index != -1) {
-      setState(() {
-        _products[index] = updatedProduct;
-        _filteredProducts = List.from(_products);
-      });
+  Color stockColor(int stock) {
+    if (stock <= 5) return Colors.red;
+    if (stock <= 20) return Colors.orange;
+    return Colors.green;
+  }
 
-      filterByStock();
+  /// PRODUCT CARD
+  Widget buildProductCard(Productclass product) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      child: Material(
+        borderRadius: BorderRadius.circular(14),
+        elevation: 3,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) =>
+                    AddProductPage(product: product, userId: currentUserId),
+              ),
+            ).then((_) => loadProducts());
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              children: [
+                Container(
+                  width: 20,
+                  height: 20,
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.inventory_2, color: Colors.blue),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        product.name,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        "Cost ₱${product.costPrice} • Retail ₱${product.retailPrice}",
+                        style: const TextStyle(color: Colors.grey),
+                      ),
+                    ],
+                  ),
+                ),
+                Column(
+                  children: [
+                    const Text("Stock"),
+                    Text(
+                      "${product.stock}",
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: stockColor(product.stock),
+                        fontSize: 16,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// EMPTY STATE
+  Widget emptyState() {
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      children: const [
+        SizedBox(height: 150),
+        Icon(Icons.inventory_2_outlined, size: 80, color: Colors.grey),
+        SizedBox(height: 10),
+        Center(
+          child: Text(
+            "No products found",
+            style: TextStyle(fontSize: 18, color: Colors.grey),
+          ),
+        ),
+        Center(
+          child: Text(
+            "Pull down to refresh",
+            style: TextStyle(color: Colors.grey),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget buildProductList() {
+    if (_filteredProducts.isEmpty) {
+      return emptyState();
     }
+
+    return ListView.builder(
+      controller: _scrollController,
+      physics: const AlwaysScrollableScrollPhysics(),
+      itemCount: _filteredProducts.length,
+      itemBuilder: (context, index) {
+        return buildProductCard(_filteredProducts[index]);
+      },
+    );
   }
 
   /// UI
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
+        backgroundColor: Colors.white,
         title: const Text("Products"),
-        actions: [
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.filter_alt),
-            onSelected: (value) {
-              _stockFilter = value;
-              filterByStock();
-            },
-            itemBuilder: (context) => const [
-              PopupMenuItem(value: "All", child: Text("All Stocks")),
-              PopupMenuItem(value: "Low", child: Text("Low Stock")),
-              PopupMenuItem(value: "High", child: Text("High Stock")),
-            ],
-          ),
-        ],
+        centerTitle: true,
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : Column(
               children: [
-                Padding(
-                  padding: const EdgeInsets.all(12),
+                // SEARCH BAR
+                Container(
+                  padding: const EdgeInsets.all(10),
                   child: TextField(
                     controller: searchController,
                     onChanged: filterSearch,
                     decoration: InputDecoration(
-                      hintText: "Search product...",
+                      hintText: "Search products...",
                       prefixIcon: const Icon(Icons.search),
+                      filled: true,
+                      fillColor: Colors.white,
                       border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide(color: Colors.black45, width: 2),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide(color: Colors.black45, width: 2),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide(color: Colors.black45, width: 2),
                       ),
                     ),
                   ),
                 ),
-                Expanded(
-                  child: _filteredProducts.isEmpty
-                      ? const Center(child: Text("No products found"))
-                      : RefreshIndicator(
-                          onRefresh: loadProducts,
-                          child: ListView.builder(
-                            controller: _scrollController,
-                            itemCount: _filteredProducts.length,
-                            itemBuilder: (context, index) {
-                              final product = _filteredProducts[index];
 
-                              return Card(
-                                margin: const EdgeInsets.symmetric(
-                                    horizontal: 12, vertical: 6),
-                                child: ListTile(
-                                  title: Text(product.name),
-                                  subtitle: Text(
-                                      "Cost ₱${product.costPrice} | Retail ₱${product.retailPrice}"),
-                                  trailing: Text("Stock ${product.stock}"),
-                                  onTap: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) => AddProductPage(
-                                          product: product,
-                                          userId: currentUserId,
-                                        ),
-                                      ),
-                                    ).then((_) => loadProducts());
-                                  },
-                                ),
-                              );
-                            },
+                // STOCK FILTER BUTTONS
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 2),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      ElevatedButton(
+                        onPressed: () => filterByStock("All"),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _stockFilter == "All"
+                              ? Colors.blue
+                              : Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(
+                              12,
+                            ), // border radius
+                            side: const BorderSide(
+                              color: Colors.black26, // border color
+                              width: 1, // border width
+                            ),
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 10,
+                          ), // size ng button
+                        ),
+                        child: Text(
+                          "All Stocks",
+                          style: TextStyle(
+                            fontSize: 14, // font size
+                            fontWeight: FontWeight.bold, // font weight
+                            color: _stockFilter == "All"
+                                ? Colors.white
+                                : Colors.black,
                           ),
                         ),
-                )
+                      ),
+                      ElevatedButton(
+                        onPressed: () => filterByStock("Low"),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _stockFilter == "Low"
+                              ? Colors.blue
+                              : Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            side: const BorderSide(
+                              color: Colors.black26,
+                              width: 1,
+                            ),
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 10,
+                          ),
+                        ),
+                        child: Text(
+                          "Low Stock",
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: _stockFilter == "Low"
+                                ? Colors.white
+                                : Colors.black,
+                          ),
+                        ),
+                      ),
+                      ElevatedButton(
+                        onPressed: () => filterByStock("High"),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _stockFilter == "High"
+                              ? Colors.blue
+                              : Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            side: const BorderSide(
+                              color: Colors.black26,
+                              width: 1,
+                            ),
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 10,
+                          ),
+                        ),
+                        child: Text(
+                          "High Stock",
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: _stockFilter == "High"
+                                ? Colors.white
+                                : Colors.black,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // PRODUCT LIST
+                Expanded(
+                  child: RefreshIndicator(
+                    onRefresh: loadProducts,
+                    child: buildProductList(),
+                  ),
+                ),
               ],
             ),
       floatingActionButton: FloatingActionButton(
+        backgroundColor: Colors.blue,
+        child: const Icon(Icons.add),
         onPressed: () {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (_) => AddProductPage(
-                userId: currentUserId,
-              ),
+              builder: (_) => AddProductPage(userId: currentUserId),
             ),
           ).then((_) => loadProducts());
         },
-        child: const Icon(Icons.add),
       ),
     );
   }
