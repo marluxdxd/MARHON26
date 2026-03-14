@@ -18,6 +18,7 @@ class _ProfileViewState extends State<ProfileView> {
   String userEmail = "";
   String userRole = "user";
   bool isLoading = true;
+  bool isClerk = false;
 
   @override
   void initState() {
@@ -66,11 +67,11 @@ class _ProfileViewState extends State<ProfileView> {
     }
   }
 
-  /// TOTAL LOGOUT (close all sessions)
+  /// TOTAL LOGOUT
   Future<void> logout(BuildContext context) async {
     try {
       await Supabase.instance.client.auth.signOut(
-        scope: SignOutScope.global, // closes all sessions
+        scope: SignOutScope.global,
       );
     } catch (e) {
       debugPrint("Logout error: $e");
@@ -88,164 +89,211 @@ class _ProfileViewState extends State<ProfileView> {
   @override
   Widget build(BuildContext context) {
     if (isLoading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     return Scaffold(
-      appBar: AppBar(
-        automaticallyImplyLeading: false,
-        title: const Text("Profile"),
-        centerTitle: true,
-      ),
-      body: SingleChildScrollView(
-        child: Center(
-          child: Column(
-            children: [
-              /// PROFILE HEADER
-              Container(
-                padding: const EdgeInsets.symmetric(vertical: 20),
-                color: Colors.blue.shade100,
-                width: double.infinity,
-                child: Column(
-                  children: [
-                    GestureDetector(
-                      onLongPress: () async {
-                        await Future.delayed(const Duration(seconds: 2));
+      body: CustomScrollView(
+        slivers: [
 
-                        if (!mounted) return;
-
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text("I love you ❤️"),
-                            duration: Duration(seconds: 2),
-                          ),
-                        );
-                      },
-                      child: CircleAvatar(
-                        radius: 50,
-                        backgroundImage:
-                            const AssetImage('assets/images/marhon.png'),
-                        backgroundColor: Colors.grey.shade300,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      userName,
-                      style: const TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      userEmail,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        color: Colors.grey,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    ElevatedButton.icon(
-                      onPressed: () {},
-                      icon: const Icon(Icons.edit),
-                      label: const Text("Edit Profile"),
-                      style: ElevatedButton.styleFrom(
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    IconButton(
-                      icon: const Icon(Icons.storage),
-                      tooltip: "Open DB Debug",
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const DebugDbScreen(),
-                          ),
-                        );
-                      },
-                    ),
-                  ],
-                ),
+          /// HIDE/SHOW APPBAR
+          SliverAppBar(
+            floating: true,
+            snap: true,
+            pinned: false,
+            backgroundColor: Colors.white,
+            elevation: 0,
+            automaticallyImplyLeading: false,
+            title: const Text(
+              "Profile",
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+                letterSpacing: -1,
               ),
+            ),
+          ),
 
-              const SizedBox(height: 20),
-
-              /// STATS
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    _buildStatCard("Kusog Halin", "0", Colors.orange),
-                    _buildStatCard("Suki Person", "0", Colors.green),
-                    _buildStatCard("Wishlist", "0", Colors.purple),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 30),
-
-              /// SETTINGS
-              Column(
+          /// BODY
+          SliverToBoxAdapter(
+            child: Center(
+              child: Column(
                 children: [
-                  _buildSettingsTile(
-                    icon: Icons.inventory,
-                    title: "Inventory",
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => InventoryStock(),
+
+                  /// PROFILE HEADER
+                  Container(
+                    padding: const EdgeInsets.symmetric(vertical: 20),
+                    color: Colors.blue.shade100,
+                    width: double.infinity,
+                    child: Column(
+                      children: [
+                        GestureDetector(
+                          onLongPress: () async {
+                            await Future.delayed(const Duration(seconds: 2));
+
+                            if (!mounted) return;
+
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text("I love you ❤️"),
+                                duration: Duration(seconds: 2),
+                              ),
+                            );
+                          },
+                          child: CircleAvatar(
+                            radius: 50,
+                            backgroundImage: const AssetImage(
+                              'assets/images/marhon.png',
+                            ),
+                            backgroundColor: Colors.grey.shade300,
+                          ),
                         ),
-                      );
-                    },
-                  ),
-                  _buildSettingsTile(
-                    icon: Icons.point_of_sale,
-                    title: "Sales",
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => SalesNavigationScreen(),
+                        const SizedBox(height: 10),
+
+                        Text(
+                          userName,
+                          style: const TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
-                      );
-                    },
-                  ),
-                  _buildSettingsTile(
-                    icon: Icons.history,
-                    title: "History",
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => HistoryScreen(),
+
+                        const SizedBox(height: 4),
+
+                        Text(
+                          userEmail,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            color: Colors.grey,
+                          ),
                         ),
-                      );
-                    },
+
+                        const SizedBox(height: 12),
+
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.person),
+                            const SizedBox(width: 8),
+                            const Text(
+                              "Clerk",
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+
+                            Switch(
+                              value: isClerk,
+                              activeColor: Colors.white,
+                              activeTrackColor: Colors.blue,
+                              inactiveThumbColor: Colors.white,
+                              inactiveTrackColor: Colors.grey,
+                              onChanged: (value) {
+                                setState(() {
+                                  isClerk = value;
+                                });
+                              },
+                            )
+                          ],
+                        ),
+
+                        const SizedBox(height: 10),
+
+                        IconButton(
+                          icon: const Icon(Icons.storage),
+                          tooltip: "Open DB Debug",
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const DebugDbScreen(),
+                              ),
+                            );
+                          },
+                        ),
+                      ],
+                    ),
                   ),
-                  _buildSettingsTile(
-                    icon: Icons.settings,
-                    title: "Settings",
-                    onTap: () {},
+
+                  const SizedBox(height: 20),
+
+                  /// STATS
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        _buildStatCard("Kusog Halin", "0", Colors.orange),
+                        _buildStatCard("Suki Person", "0", Colors.green),
+                        _buildStatCard("Wishlist", "0", Colors.purple),
+                      ],
+                    ),
                   ),
-                  _buildSettingsTile(
-                    icon: Icons.logout,
-                    title: "Logout",
-                    iconColor: Colors.red,
-                    onTap: () => logout(context),
+
+                  const SizedBox(height: 30),
+
+                  /// SETTINGS
+                  Column(
+                    children: [
+                      _buildSettingsTile(
+                        icon: Icons.inventory,
+                        title: "Inventory",
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (_) => InventoryStock()),
+                          );
+                        },
+                      ),
+
+                      _buildSettingsTile(
+                        icon: Icons.point_of_sale,
+                        title: "Sales",
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => SalesNavigationScreen(),
+                            ),
+                          );
+                        },
+                      ),
+
+                      _buildSettingsTile(
+                        icon: Icons.history,
+                        title: "History",
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (_) => HistoryScreen()),
+                          );
+                        },
+                      ),
+
+                      _buildSettingsTile(
+                        icon: Icons.settings,
+                        title: "Settings",
+                        onTap: () {},
+                      ),
+
+                      _buildSettingsTile(
+                        icon: Icons.logout,
+                        title: "Logout",
+                        iconColor: Colors.red,
+                        onTap: () => logout(context),
+                      ),
+                    ],
                   ),
                 ],
               ),
-            ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -270,10 +318,7 @@ class _ProfileViewState extends State<ProfileView> {
             ),
           ),
           const SizedBox(height: 4),
-          Text(
-            title,
-            style: const TextStyle(color: Colors.black54),
-          ),
+          Text(title, style: const TextStyle(color: Colors.black54)),
         ],
       ),
     );

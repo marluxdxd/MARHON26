@@ -33,10 +33,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen>
     fetchLocalTransactions();
     fetchServerTransactions();
 
-    // Auto-refresh when internet comes back
-    _internetSub = InternetConnectionChecker().onStatusChange.listen((
-      status,
-    ) async {
+    _internetSub = InternetConnectionChecker().onStatusChange.listen((status) async {
       if (status == InternetConnectionStatus.connected) {
         await fetchLocalTransactions();
         await fetchServerTransactions();
@@ -52,7 +49,6 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen>
     super.dispose();
   }
 
-  // ------------------- LOCAL -------------------
   Future<void> fetchLocalTransactions() async {
     final db = await LocalDatabase().database;
 
@@ -78,7 +74,6 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen>
       ORDER BY t.created_at DESC, ti.id ASC
     ''');
 
-    // Group transactions with items
     Map<int, Map<String, dynamic>> grouped = {};
     for (var row in history) {
       final txId = row['tx_id'] as int;
@@ -111,39 +106,30 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen>
     });
   }
 
-  // ------------------- SERVER -------------------
   Future<void> fetchServerTransactions() async {
     try {
-      // 1️⃣ Fetch all transactions
       final txList = await supabase
           .from('transactions')
           .select('*')
           .order('created_at', ascending: false);
-
       final txListData = List<Map<String, dynamic>>.from(txList as List);
 
-      // Prepare a map to store items per transaction
       Map<int, List<Map<String, dynamic>>> itemsMap = {};
 
-      // 2️⃣ Loop through each transaction
       for (var tx in txListData) {
         final txId = tx['id'] as int;
 
-        // Fetch transaction_items for this transaction
         final itemResponse = await supabase
             .from('transaction_items')
             .select('*')
             .eq('transaction_id', txId);
 
-        // Fetch transaction_promos for this transaction
         final promoResponse = await supabase
             .from('transaction_promos')
             .select('*')
             .eq('transaction_id', txId);
 
-        // Map items and attach promo_count if it exists
         final items = (itemResponse as List).map<Map<String, dynamic>>((item) {
-          // Find promo for this item using product_id
           final promo = (promoResponse as List).firstWhere(
             (p) => p['product_id'] == item['product_id'],
             orElse: () => {'promo_count': 0},
@@ -172,7 +158,6 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen>
     }
   }
 
-  // ------------------- CARD -------------------
   Widget buildTransactionCard({
     required int txId,
     required double total,
@@ -181,7 +166,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen>
     required List<Map<String, dynamic>> items,
   }) {
     return Card(
-      margin: const EdgeInsets.all(8),
+      margin: const EdgeInsets.all(2),
       child: ExpansionTile(
         title: Text("Transaction #$txId - Total: ₱${total.toStringAsFixed(2)}"),
         subtitle: Text(
@@ -195,31 +180,18 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen>
                 final bool isPromo = item['is_promo'] == true;
                 final int qty = item['qty'] ?? 0;
                 final int promoCount = item['promo_count'] ?? 0;
-                final double retailPrice = (item['retail_price'] as num)
-                    .toDouble();
-                final double rowTotal = isPromo
-                    ? retailPrice * promoCount
-                    : retailPrice * qty;
-                print(
-                  'Item: ${item['product_name']} | qty: $qty | promoCount: $promoCount | retailPrice: $retailPrice | rowTotal: $rowTotal',
-                );
+                final double retailPrice = (item['retail_price'] as num).toDouble();
+                final double rowTotal = isPromo ? retailPrice * promoCount : retailPrice * qty;
 
                 return Container(
                   decoration: BoxDecoration(
                     border: Border(
-                      bottom: BorderSide(
-                        color: Colors.black,
-                        width: 1,
-                      ), // line under each row
+                      bottom: BorderSide(color: Colors.black12, width: 1),
                     ),
                   ),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 6,
-                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                   child: Row(
                     children: [
-                      // Product Name + Promo Info
                       Expanded(
                         flex: 5,
                         child: Column(
@@ -238,21 +210,8 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen>
                           ],
                         ),
                       ),
-
-                      // Quantity
-                      Expanded(
-                        flex: 2,
-                        child: Text('$qty', textAlign: TextAlign.center),
-                      ),
-
-                      // Subtotal / Total
-                      Expanded(
-                        flex: 3,
-                        child: Text(
-                          '₱${rowTotal.toStringAsFixed(2)}',
-                          textAlign: TextAlign.right,
-                        ),
-                      ),
+                      Expanded(flex: 2, child: Text('$qty', textAlign: TextAlign.center)),
+                      Expanded(flex: 3, child: Text('₱${rowTotal.toStringAsFixed(2)}', textAlign: TextAlign.right)),
                     ],
                   ),
                 );
@@ -264,57 +223,76 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        automaticallyImplyLeading: false,
-        title: const Text('Transaction History'),
-        bottom: TabBar(
+      body: NestedScrollView(
+        headerSliverBuilder: (context, innerBoxIsScrolled) => [
+          SliverAppBar(
+            floating: true,
+            snap: true,
+            pinned: false,
+            automaticallyImplyLeading: false,
+            backgroundColor: Colors.white,
+            elevation: 0,
+            title: const Text(
+              "Transactions",
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+                letterSpacing: -1,
+              ),
+            ),
+            bottom: TabBar(
+              controller: _tabController,
+              tabs: const [
+                Tab(text: 'Phone'),
+                Tab(text: 'Server'),
+              ],
+              labelColor: Colors.blue,
+              unselectedLabelColor: Colors.black54,
+              indicatorColor: Colors.blue,
+            ),
+          )
+        ],
+        body: TabBarView(
           controller: _tabController,
-          tabs: const [
-            Tab(text: 'Phone'),
-            Tab(text: 'Server'),
+          children: [
+            RefreshIndicator(
+              onRefresh: fetchLocalTransactions,
+              child: ListView.builder(
+                physics: const AlwaysScrollableScrollPhysics(),
+                itemCount: localTransactions.length,
+                itemBuilder: (_, index) {
+                  final tx = localTransactions[index];
+                  return buildTransactionCard(
+                    txId: tx['tx_id'],
+                    total: tx['total'],
+                    cash: tx['cash'],
+                    change: tx['change'],
+                    items: tx['items'],
+                  );
+                },
+              ),
+            ),
+            RefreshIndicator(
+              onRefresh: fetchServerTransactions,
+              child: ListView.builder(
+                physics: const AlwaysScrollableScrollPhysics(),
+                itemCount: serverTransactions.length,
+                itemBuilder: (_, index) {
+                  final tx = serverTransactions[index];
+                  final items = serverTransactionItems[tx['id']] ?? [];
+                  return buildTransactionCard(
+                    txId: tx['id'],
+                    total: (tx['total'] as num).toDouble(),
+                    cash: (tx['cash'] as num).toDouble(),
+                    change: (tx['change'] as num).toDouble(),
+                    items: items,
+                  );
+                },
+              ),
+            ),
           ],
         ),
-      ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          // ---------------- PHONE TAB ----------------
-          RefreshIndicator(
-            onRefresh: fetchLocalTransactions,
-            child: ListView.builder(
-              itemCount: localTransactions.length,
-              itemBuilder: (_, index) {
-                final tx = localTransactions[index];
-                return buildTransactionCard(
-                  txId: tx['tx_id'],
-                  total: tx['total'],
-                  cash: tx['cash'],
-                  change: tx['change'],
-                  items: tx['items'],
-                );
-              },
-            ),
-          ),
-
-          // ---------------- SERVER TAB ----------------
-          RefreshIndicator(
-            onRefresh: fetchServerTransactions,
-            child: ListView.builder(
-              itemCount: serverTransactions.length,
-              itemBuilder: (_, index) {
-                final tx = serverTransactions[index];
-                final items = serverTransactionItems[tx['id']] ?? [];
-                return buildTransactionCard(
-                  txId: tx['id'],
-                  total: (tx['total'] as num).toDouble(),
-                  cash: (tx['cash'] as num).toDouble(),
-                  change: (tx['change'] as num).toDouble(),
-                  items: items,
-                );
-              },
-            ),
-          ),
-        ],
       ),
     );
   }

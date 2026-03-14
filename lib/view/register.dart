@@ -1,9 +1,9 @@
+
 import 'package:cashier/view/login.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:cashier/widget/main_navigation.dart';
-
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -12,11 +12,47 @@ class RegisterScreen extends StatefulWidget {
   State<RegisterScreen> createState() => _RegisterScreenState();
 }
 
-class _RegisterScreenState extends State<RegisterScreen> {
+class _RegisterScreenState extends State<RegisterScreen>
+    with SingleTickerProviderStateMixin {
+
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
   final TextEditingController confirmController = TextEditingController();
+
   bool loading = false;
+
+  late AnimationController _controller;
+  late Animation<double> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+
+    /// Floating logo animation
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..repeat(reverse: true);
+
+    _animation = Tween<double>(
+      begin: -10,
+      end: 10,
+    ).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: Curves.easeInOut,
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    emailController.dispose();
+    passwordController.dispose();
+    confirmController.dispose();
+    _controller.dispose();
+    super.dispose();
+  }
 
   void register() async {
     String email = emailController.text.trim();
@@ -46,25 +82,26 @@ class _RegisterScreenState extends State<RegisterScreen> {
       );
 
       if (response.user != null) {
-        // Optional: Insert into profiles table
+
         await Supabase.instance.client.from('profiles').insert({
           'id': response.user!.id,
           'email': email,
           'role': 'user',
         });
 
-        // Navigate to main screen
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
             builder: (_) => const MainNav(),
           ),
         );
+
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Registration failed")),
         );
       }
+
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Error: $e")),
@@ -76,32 +113,35 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   @override
   Widget build(BuildContext context) {
+
     return Scaffold(
       body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Colors.white10,Colors.white],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-        ),
+    
+
         child: Center(
           child: SingleChildScrollView(
-   
-            child: Card(
-           
-              
- 
+          
               child: Padding(
-                padding: const EdgeInsets.all(10),
+                padding: const EdgeInsets.all(20),
+
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Logo
-                    SvgPicture.asset(
-                      'assets/icons/mh.svg',
-                      width: 100,
-                      height: 100,
+
+                    /// Animated Logo
+                    AnimatedBuilder(
+                      animation: _animation,
+                      builder: (context, child) {
+                        return Transform.translate(
+                          offset: Offset(0, _animation.value),
+                          child: child,
+                        );
+                      },
+                      child: SvgPicture.asset(
+                        'assets/icons/mh.svg',
+                        width: 100,
+                        height: 100,
+                      ),
                     ),
 
                     const SizedBox(height: 25),
@@ -127,7 +167,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
                     const SizedBox(height: 30),
 
-                    // Email
+                    /// Email
                     TextField(
                       controller: emailController,
                       keyboardType: TextInputType.emailAddress,
@@ -142,7 +182,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
                     const SizedBox(height: 20),
 
-                    // Password
+                    /// Password
                     TextField(
                       controller: passwordController,
                       obscureText: true,
@@ -157,7 +197,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
                     const SizedBox(height: 20),
 
-                    // Confirm Password
+                    /// Confirm Password
                     TextField(
                       controller: confirmController,
                       obscureText: true,
@@ -172,29 +212,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
                     const SizedBox(height: 35),
 
-                    // Register Button
+                    /// Register Button
                     SizedBox(
                       width: double.infinity,
                       height: 55,
+
                       child: ElevatedButton(
                         onPressed: loading ? null : register,
+
                         style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 1),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(20),
                           ),
-                          elevation: 5,
-                          backgroundColor: Colors.transparent,
+               
+                          backgroundColor: Colors.blue,
                         ),
-                        child: Ink(
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                                colors: [Colors.blue, Color(0xFF2575FC)],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
+
+                   
                           child: Container(
                             alignment: Alignment.center,
                             child: loading
@@ -206,16 +240,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                     style: TextStyle(
                                       fontSize: 18,
                                       fontWeight: FontWeight.bold,
+                                      color: Colors.white,
                                     ),
                                   ),
-                          ),
+                          
                         ),
                       ),
                     ),
 
                     const SizedBox(height: 15),
 
-                    // Navigate to Login
+                    /// Login Button
                     TextButton(
                       onPressed: () {
                         Navigator.pushReplacement(
@@ -225,15 +260,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           ),
                         );
                       },
-                      child: const Text("Already have an account? Login"),
+
+                      child: const Text(
+                        "Already have an account? Login",
+                        style: TextStyle(
+                          color: Colors.blueAccent,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
                   ],
                 ),
               ),
-            ),
+            
           ),
         ),
       ),
     );
   }
 }
+

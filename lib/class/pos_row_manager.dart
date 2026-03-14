@@ -420,7 +420,7 @@ Future<void> handleScannedBarcode(
           decoration: BoxDecoration(
             border: Border.all(color: Colors.grey),
             borderRadius: BorderRadius.circular(4),
-            color: Colors.grey[200],
+            color: Colors.transparent,
           ),
           child: Text(
             row.isPromo ? row.otherQty.toString() : row.qty.toString(),
@@ -473,7 +473,7 @@ Future<void> handleScannedBarcode(
               color: Colors.red,
               borderRadius: BorderRadius.circular(6),
             ),
-            child: const Icon(Icons.delete, color: Colors.white),
+            child: const Icon(Icons.delete, color: Colors.red),
           ),
           onDismissed: (_) {
             if (row.isPromo && row.product != null) {

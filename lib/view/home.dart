@@ -491,7 +491,7 @@ class _HomeState extends State<Home> {
           // Optional background SVG
           Positioned.fill(
             child: Opacity(
-              opacity: 0.05, // very faint background
+              opacity: 0.03, // very faint background
               child: SvgPicture.asset(
                 'assets/icons/logo4.svg',
                 fit: BoxFit.cover,

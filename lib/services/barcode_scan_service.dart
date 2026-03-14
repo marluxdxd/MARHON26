@@ -11,6 +11,11 @@ class BarcodeScanService {
   /// ⭐ SUPER FAST LOOKUP CACHE
   static Map<String, Productclass> _barcodeMap = {};
 
+  static void clearCache() {
+  _barcodeMap.clear();
+  debugPrint("BARCODE CACHE CLEARED");
+}
+
   static Future<void> refreshProductData({
     required ProductService productService,
     required List<POSRow> rows,
@@ -37,6 +42,8 @@ class BarcodeScanService {
   /// BUILD CACHE
   /// ===============================
   static void buildBarcodeCache(List<Productclass> products) {
+    _barcodeMap.clear();
+
     _barcodeMap = {
       for (var p in products)
         if (p.barcode.trim().isNotEmpty)
@@ -74,11 +81,14 @@ class BarcodeScanService {
     required ScanMode mode,
     Function(String barcode)? onAddProductScan,
   }) async {
+      final productService = ProductService();
+
     if (_barcodeMap.isEmpty) {
+      final products = await productService.getProducts();
       buildBarcodeCache(products);
     }
 
-    final productService = ProductService();
+    
 
     await Navigator.push(
       context,

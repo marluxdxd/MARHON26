@@ -2,8 +2,8 @@ import 'package:cashier/view/register.dart';
 import 'package:cashier/widget/main_navigation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -12,14 +12,69 @@ class LoginScreen extends StatefulWidget {
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _LoginScreenState extends State<LoginScreen>
+    with SingleTickerProviderStateMixin {
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
+
   bool loading = false;
+
+  late AnimationController _controller;
+  late Animation<double> _animation;
+bool rememberMe = true;
+
+/// Save email and password
+Future<void> saveCredentials(String email, String password) async {
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.setString('email', email);
+  await prefs.setString('password', password);
+}
+
+/// Load saved email and password
+Future<void> loadCredentials() async {
+  final prefs = await SharedPreferences.getInstance();
+  String? savedEmail = prefs.getString('email');
+  String? savedPassword = prefs.getString('password');
+
+  if (savedEmail != null) emailController.text = savedEmail;
+  if (savedPassword != null) passwordController.text = savedPassword;
+}
+
+
+
+
+
+  @override
+  void initState() {
+    super.initState();
+
+    /// Bounce animation controller
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..repeat(reverse: true);
+
+    _animation = Tween<double>(
+      begin: -10,
+      end: 10,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
+
+     loadCredentials();
+  }
+
+  @override
+  void dispose() {
+    emailController.dispose();
+    passwordController.dispose();
+    _controller.dispose();
+    super.dispose();
+  }
 
   void login() async {
     String email = emailController.text.trim();
     String password = passwordController.text.trim();
+
+    
 
     if (email.isEmpty || password.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -36,22 +91,22 @@ class _LoginScreenState extends State<LoginScreen> {
         password: password,
       );
 
-      if (response.user != null) {
+
+      if (response.user != null && rememberMe) {
+        await saveCredentials(email, password);
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(
-            builder: (_) => const MainNav(),
-          ),
+          MaterialPageRoute(builder: (_) => const MainNav()),
         );
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Login failed")),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text("Login failed")));
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error: $e")),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Error: $e")));
     } finally {
       setState(() => loading = false);
     }
@@ -61,146 +116,136 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Colors.white, Colors.white],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-        ),
         child: Center(
           child: SingleChildScrollView(
-         
-            child: Card(
-            
-      
-
-              child: Padding(
-                padding: const EdgeInsets.all(10),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Logo
-                    SvgPicture.asset(
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  /// ⭐ Animated Logo
+                  AnimatedBuilder(
+                    animation: _animation,
+                    builder: (context, child) {
+                      return Transform.translate(
+                        offset: Offset(0, _animation.value),
+                        child: child,
+                      );
+                    },
+                    child: SvgPicture.asset(
                       'assets/icons/mh.svg',
                       width: 100,
                       height: 100,
                     ),
+                  ),
 
-                    const SizedBox(height: 25),
+                  const SizedBox(height: 25),
 
-                    const Text(
-                      "Welcome Back",
+                  const Text(
+                    "Welcome Back",
+                    style: TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
+                  ),
+
+                  const SizedBox(height: 8),
+
+                  const Text(
+                    "Login to your account",
+                    style: TextStyle(fontSize: 16, color: Colors.black54),
+                  ),
+
+                  const SizedBox(height: 30),
+
+                  /// Email
+                  TextField(
+                    controller: emailController,
+                    keyboardType: TextInputType.emailAddress,
+                    decoration: InputDecoration(
+                      labelText: "Email",
+                      prefixIcon: const Icon(Icons.email),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  /// Password
+                  TextField(
+                    controller: passwordController,
+                    obscureText: true,
+                    decoration: InputDecoration(
+                      labelText: "Password",
+                      prefixIcon: const Icon(Icons.lock),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                    ),
+                  ),
+                  CheckboxListTile(
+  value: rememberMe,
+  onChanged: (value) {
+    setState(() {
+      rememberMe = value!;
+    });
+  },
+  title: const Text("Remember Me"),
+),
+
+                  const SizedBox(height: 35),
+
+                  /// Login Button
+                  SizedBox(
+                    height: 55,
+                    child: ElevatedButton(
+                      onPressed: loading ? null : login,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue,
+                      ),
+
+                      child: Container(
+                        alignment: Alignment.center,
+                        child: loading
+                            ? const CircularProgressIndicator(
+                                color: Colors.white,
+                              )
+                            : const Text(
+                                "Login",
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 15),
+
+                  /// Register
+                  TextButton(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const RegisterScreen(),
+                        ),
+                      );
+                    },
+                    child: const Text(
+                      "Don't have an account? Register now",
                       style: TextStyle(
-                        fontSize: 28,
+                        color: Colors.blueAccent,
                         fontWeight: FontWeight.bold,
-                        color: Colors.black87,
                       ),
                     ),
-
-                    const SizedBox(height: 8),
-
-                    const Text(
-                      "Login to your account",
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: Colors.black54,
-                      ),
-                    ),
-
-                    const SizedBox(height: 30),
-
-                    // Email Field
-                    TextField(
-                      controller: emailController,
-                      keyboardType: TextInputType.emailAddress,
-                      decoration: InputDecoration(
-                        labelText: "Email",
-                        prefixIcon: const Icon(Icons.email),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 20),
-
-                    // Password Field
-                    TextField(
-                      controller: passwordController,
-                      obscureText: true,
-                      decoration: InputDecoration(
-                        labelText: "Password",
-                        prefixIcon: const Icon(Icons.lock),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 35),
-
-                    // Login Button
-                    SizedBox(
-                      width: double.infinity,
-                      height: 55,
-                      child: ElevatedButton(
-                        onPressed: loading ? null : login,
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 1),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          elevation: 5,
-                          backgroundColor: Colors.transparent,
-                        ),
-                        child: Ink(
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [Colors.blue, Color(0xFF2575FC)],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Container(
-                            alignment: Alignment.center,
-                            child: loading
-                                ? const CircularProgressIndicator(color: Colors.white)
-                                : const Text(
-                                    "Login",
-                                    style: TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 15),
-
-                    // Register Button
-                    TextButton(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const RegisterScreen(),
-                          ),
-                        );
-                      },
-                      child: const Text(
-                        "Don't have an account? Register now",
-                        style: TextStyle(
-                          color: Colors.blueAccent,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           ),
