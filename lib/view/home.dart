@@ -161,7 +161,7 @@ class _HomeState extends State<Home> {
               horizontal: padding,
             ),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: Colors.transparent,
               borderRadius: BorderRadius.circular(15),
             ),
             child: Row(
@@ -438,57 +438,69 @@ class _HomeState extends State<Home> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-
       appBar: AppBar(
-    automaticallyImplyLeading: false,
-    backgroundColor: Colors.white,
-    elevation: 0,
-    centerTitle: false,
-    title: Row(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        // SVG Logo
-        SvgPicture.asset(
-          'assets/icons/logo4.svg',
-          width: 50,
-          height: 50,
+        automaticallyImplyLeading: false,
+        backgroundColor: Colors.white,
+        elevation: 0,
+        centerTitle: false,
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            // SVG Logo with optional opacity
+            Opacity(
+              opacity: 1.0, // change to 0.3 for semi-transparent
+              child: SvgPicture.asset(
+                'assets/icons/logo4.svg',
+                width: 50,
+                height: 50,
+              ),
+            ),
+            const SizedBox(width: 8),
+            const Text(
+              "SukiBarato",
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+                letterSpacing: -1,
+              ),
+            ),
+          ],
         ),
-   
-        const Text(
-          "SukiBarato",
-          style: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
-            color: Colors.black87,
-            letterSpacing: -1,
-      
+        actions: [
+          Stack(
+            children: [
+              AnimatedNotificationIcon(
+                notificationCount: notificationCount,
+                onPressed: () async {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const NotificationsPage()),
+                  );
+                  loadNotificationCount();
+                },
+              ),
+            ],
           ),
-           ),
-              ],
-         ),
-         actions: [
-           Stack(
-              children: [
-          AnimatedNotificationIcon(
-            notificationCount: notificationCount,
-            onPressed: () async {
-              await Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const NotificationsPage(),
-                ),
-              );
-              loadNotificationCount();
-            },
-          ),
+          const SizedBox(width: 10),
         ],
       ),
-      const SizedBox(width: 10),
-    ],
-  ),
-
-      body: _buildMainContent(),
+      body: Stack(
+        children: [
+          // Optional background SVG
+          Positioned.fill(
+            child: Opacity(
+              opacity: 0.05, // very faint background
+              child: SvgPicture.asset(
+                'assets/icons/logo4.svg',
+                fit: BoxFit.cover,
+              ),
+            ),
+          ),
+          _buildMainContent(),
+        ],
+      ),
     );
   }
 }
