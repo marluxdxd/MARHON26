@@ -26,15 +26,6 @@ void main() async {
   // Initialize Android Alarm Manager
   await AndroidAlarmManager.initialize();
 
-  // AndroidAlarmManager.periodic(
-  //     const Duration(minutes: 1),
-  //     0, // unique ID for this alarm
-  //     periodicNotificationCallback,
-  //     wakeup: true, // wakes device if asleep
-  //     exact: true,
-  //   );
-
-  // Initialize services
   final productService = ProductService();
   final transactionService = TransactionService();
   final transactionItemService = TransactionItemService();

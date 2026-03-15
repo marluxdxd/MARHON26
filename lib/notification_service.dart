@@ -36,6 +36,9 @@ class NotificationsServices {
       await _requestAndroidNotificationPermission();
     }
 
+    /// Create chat notification channel
+    await createChatChannel();
+
     /// Start periodic checks
     _startPeriodicNotifications();
   }
@@ -47,6 +50,47 @@ class NotificationsServices {
       await Permission.notification.request();
     }
   }
+
+  /// ---------------- CHAT NOTIFICATION CHANNEL ----------------
+ Future<void> createChatChannel() async {
+  const channel = AndroidNotificationChannel(
+    'chat_channel', // id
+    'Chat Messages', // name
+    description: 'Notifications for new chat messages', // description
+    importance: Importance.max,
+    playSound: true,
+  );
+
+  await _flutterLocalNotificationsPlugin
+      .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>()
+      ?.createNotificationChannel(channel);
+}
+
+  /// ---------------- CHAT MESSAGE NOTIFICATION ----------------
+  Future<void> showChatNotification({
+  required String messageId,
+  required String content,
+}) async {
+  const androidDetails = AndroidNotificationDetails(
+    'chat_channel',
+    'Chat Messages',
+    channelDescription: 'New chat messages',
+    importance: Importance.max,
+    priority: Priority.high,
+    playSound: true,
+  );
+
+  const notificationDetails = NotificationDetails(android: androidDetails);
+
+  await _flutterLocalNotificationsPlugin.show(
+    int.parse(messageId.hashCode.toString().substring(0, 7)), // unique ID
+    'New Message',
+    content,
+    notificationDetails,
+    payload: 'chat_message',
+  );
+}
 
   /// ---------------- LOW STOCK ----------------
   Future<void> showLowStockNotification() async {
@@ -142,40 +186,31 @@ class NotificationsServices {
     _pendingSyncTimer?.cancel();
 
     /// LOW STOCK → every 1 hour
-    _lowStockTimer = Timer.periodic(
-      const Duration(hours: 1),
-      (_) async {
-        try {
-          await showLowStockNotification();
-        } catch (e) {
-          debugPrint('Low stock notification error: $e');
-        }
-      },
-    );
+    _lowStockTimer = Timer.periodic(const Duration(hours: 1), (_) async {
+      try {
+        await showLowStockNotification();
+      } catch (e) {
+        debugPrint('Low stock notification error: $e');
+      }
+    });
 
     /// MISSING BARCODE → every 2 hours
-    _barcodeTimer = Timer.periodic(
-      const Duration(hours: 1),
-      (_) async {
-        try {
-          await showMissingBarcodeNotification();
-        } catch (e) {
-          debugPrint('Missing barcode notification error: $e');
-        }
-      },
-    );
+    _barcodeTimer = Timer.periodic(const Duration(hours: 1), (_) async {
+      try {
+        await showMissingBarcodeNotification();
+      } catch (e) {
+        debugPrint('Missing barcode notification error: $e');
+      }
+    });
 
     /// PENDING SYNC → every 30 minutes
-    _pendingSyncTimer = Timer.periodic(
-      const Duration(hours: 1),
-      (_) async {
-        try {
-          await showPendingSyncNotification();
-        } catch (e) {
-          debugPrint('Pending sync notification error: $e');
-        }
-      },
-    );
+    _pendingSyncTimer = Timer.periodic(const Duration(hours: 1), (_) async {
+      try {
+        await showPendingSyncNotification();
+      } catch (e) {
+        debugPrint('Pending sync notification error: $e');
+      }
+    });
   }
 
   /// ---------------- CANCEL ALL ----------------
@@ -186,11 +221,13 @@ class NotificationsServices {
     _barcodeTimer?.cancel();
     _pendingSyncTimer?.cancel();
   }
+
   /// ---------------- SHOW ALL ----------------
   Future<void> showAllNotifications() async {
     await showLowStockNotification();
     await showMissingBarcodeNotification();
   }
+
   /// ---------------- BADGE COUNT FOR HOME ----------------
   Future<int> getNotificationCount() async {
     int count = 0;

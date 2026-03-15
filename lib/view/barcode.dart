@@ -2,6 +2,7 @@ import 'package:cashier/services/product_service.dart';
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:audioplayers/audioplayers.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:vibration/vibration.dart';
 
 import '../class/productclass.dart';
@@ -59,7 +60,7 @@ class _BarcodeScannerPageState extends State<BarcodeScannerPage> {
   Future<Productclass?> _findProduct(String barcode) async {
     final db = await LocalDatabase().database;
     final result =
-        await db.query('products', where: 'barcode = ?', whereArgs: [barcode], limit: 1);
+        await db.query('products', where: 'barcode = ? AND user_id = ?', whereArgs: [barcode,Supabase.instance.client.auth.currentUser!.id], limit: 1);
     if (result.isEmpty) return null;
     return Productclass.fromMap(result.first);
   }

@@ -1,4 +1,5 @@
 import 'package:cashier/screens/debug_db_screen.dart';
+import 'package:cashier/sendmail/sendemail.dart';
 import 'package:cashier/view/history_stock_screen.dart';
 import 'package:cashier/view/login.dart';
 import 'package:cashier/view/reports_file/sales_reports_screen.dart';
@@ -201,7 +202,16 @@ class _ProfileViewState extends State<ProfileView> {
                         ),
 
                         const SizedBox(height: 10),
-
+ElevatedButton(
+  onPressed: () {
+    sendEmail(
+      to: 'ikam7247@gmail.com',
+      subject: 'Test Email from Flutter',
+      text: 'Hello! This is a test message from my app.',
+    );
+  },
+  child: Text('Send Test Email'),
+),
                         IconButton(
                           icon: const Icon(Icons.storage),
                           tooltip: "Open DB Debug",

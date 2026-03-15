@@ -1,24 +1,16 @@
-import 'dart:async';
-import 'package:flutter/material.dart';
 
-enum BounceDirection {
-  up,
-  down,
-  left,
-  right,
-  center,
-}
+import 'dart:async';
+import 'dart:math';
+import 'package:flutter/material.dart';
 
 class AnimatedNotificationIcon extends StatefulWidget {
   final int notificationCount;
   final VoidCallback onPressed;
-  final BounceDirection direction;
 
   const AnimatedNotificationIcon({
     Key? key,
     required this.notificationCount,
     required this.onPressed,
-    this.direction = BounceDirection.up,
   }) : super(key: key);
 
   @override
@@ -29,7 +21,10 @@ class AnimatedNotificationIcon extends StatefulWidget {
 class _AnimatedNotificationIconState extends State<AnimatedNotificationIcon>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
-  late Animation<double> _animation;
+
+  late Animation<double> _rotationAnimation;
+  late Animation<double> _scaleAnimation;
+
   Timer? _timer;
 
   @override
@@ -38,42 +33,37 @@ class _AnimatedNotificationIconState extends State<AnimatedNotificationIcon>
 
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 400),
+      duration: const Duration(milliseconds: 900),
     );
 
-    _animation = Tween<double>(begin: -8, end: 8).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: Curves.easeInOut,
-      ),
-    );
+    /// Bell swing animation (left-right like real bell)
+    _rotationAnimation = TweenSequence<double>([
+      TweenSequenceItem(tween: Tween(begin: 0.0, end: -0.35), weight: 1),
+      TweenSequenceItem(tween: Tween(begin: -0.35, end: 0.35), weight: 2),
+      TweenSequenceItem(tween: Tween(begin: 0.35, end: -0.25), weight: 2),
+      TweenSequenceItem(tween: Tween(begin: -0.25, end: 0.25), weight: 2),
+      TweenSequenceItem(tween: Tween(begin: 0.25, end: 0.0), weight: 1),
+    ]).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
 
-    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+    /// Small bounce effect
+    _scaleAnimation = TweenSequence<double>([
+      TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.15), weight: 1),
+      TweenSequenceItem(tween: Tween(begin: 1.15, end: 0.95), weight: 1),
+      TweenSequenceItem(tween: Tween(begin: 0.95, end: 1.0), weight: 1),
+    ]).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
+
+    /// Trigger bell animation every few seconds
+    _timer = Timer.periodic(const Duration(seconds: 5), (_) {
       if (mounted && widget.notificationCount > 0) {
         _controller.forward(from: 0);
       }
     });
   }
 
-  Offset _getOffset(double value) {
-    switch (widget.direction) {
-      case BounceDirection.up:
-        return Offset(0, -value.abs());
-      case BounceDirection.down:
-        return Offset(0, value.abs());
-      case BounceDirection.left:
-        return Offset(-value.abs(), 0);
-      case BounceDirection.right:
-        return Offset(value.abs(), 0);
-      case BounceDirection.center:
-        return Offset(value, 0); // shake effect
-    }
-  }
-
   @override
   void dispose() {
-    _controller.dispose();
     _timer?.cancel();
+    _controller.dispose();
     super.dispose();
   }
 
@@ -82,28 +72,34 @@ class _AnimatedNotificationIconState extends State<AnimatedNotificationIcon>
     return Stack(
       children: [
         AnimatedBuilder(
-          animation: _animation,
+          animation: _controller,
           builder: (_, child) {
-            return Transform.translate(
-              offset: _getOffset(_animation.value),
-              child: child,
+            return Transform.rotate(
+              angle: _rotationAnimation.value,
+              alignment: Alignment.topCenter, // pivot like hanging bell
+              child: Transform.scale(
+                scale: _scaleAnimation.value,
+                child: child,
+              ),
             );
           },
           child: IconButton(
             icon: const Icon(
-              Icons.mail_outline_outlined,
-              size: 30,
+              Icons.notifications_none,
+              size: 40,
               color: Colors.black,
             ),
             onPressed: widget.onPressed,
           ),
         ),
+
+        /// Notification badge
         if (widget.notificationCount > 0)
           Positioned(
-            right: 7,
-            top: 10,
+            right: 6,
+            top: 8,
             child: Container(
-              padding: const EdgeInsets.all(4),
+              padding: const EdgeInsets.all(5),
               decoration: const BoxDecoration(
                 color: Colors.red,
                 shape: BoxShape.circle,
@@ -113,6 +109,7 @@ class _AnimatedNotificationIconState extends State<AnimatedNotificationIcon>
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 10,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
             ),
@@ -121,3 +118,4 @@ class _AnimatedNotificationIconState extends State<AnimatedNotificationIcon>
     );
   }
 }
+

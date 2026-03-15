@@ -6,6 +6,7 @@ import 'package:cashier/database/local_db_transactionpromo.dart';
 import 'package:cashier/icon-animate/animated_notification_icon.dart';
 import 'package:cashier/main.dart';
 import 'package:cashier/notification_service.dart';
+import 'package:cashier/services/chat_badge_service.dart';
 import 'package:cashier/services/product_service.dart';
 import 'package:cashier/services/stock_history_sync.dart';
 import 'package:cashier/services/transaction_promo_service.dart';
@@ -13,6 +14,7 @@ import 'package:cashier/services/transaction_service.dart';
 import 'package:cashier/utils.dart';
 import 'package:cashier/class/pos_row_manager.dart';
 import 'package:cashier/class/productclass.dart';
+import 'package:cashier/view/message_main_page.dart';
 import 'package:cashier/view/notification_page.dart';
 import 'package:cashier/widget/sukli.dart';
 import 'package:flutter/material.dart';
@@ -46,24 +48,21 @@ class Home extends StatefulWidget {
 }
 
 class _HomeState extends State<Home> {
+  final SupabaseClient supabase = Supabase.instance.client;
+  late ChatBadgeService chatBadgeService;
+  int unreadCount = 0;
   final NotificationsServices notificationsServices = NotificationsServices();
-
   late POSRowManager posManager;
-
   StreamSubscription<InternetConnectionStatus>? _listener;
   StreamSubscription<ConnectivityResult>? _connectivityListener;
-
   TextEditingController customerCashController = TextEditingController();
-
   final TransactionService transactionService = TransactionService();
   final ProductService productService = ProductService();
   final StockHistorySyncService stockHistorySyncService =
       StockHistorySyncService();
   bool isSyncingOnline = false;
-
   int notificationCount = 0;
   Timer? notificationTimer;
-
   final LocalDatabase localDb = LocalDatabase();
   Future<void> loadNotificationCount() async {
     try {
@@ -81,16 +80,8 @@ class _HomeState extends State<Home> {
   @override
   void initState() {
     super.initState();
-    // Schedule background alarm
-    // AndroidAlarmManager.periodic(
-    //   const Duration(minutes: 1),
-    //   0, // unique ID for this alarm
-    //   periodicNotificationCallback,
-    //   wakeup: true, // wakes device if asleep
-    //   exact: true,
-    // );
     posManager = widget.posManager;
-
+    getCurrentUser();
     // Initialize notifications
     Future.microtask(() async {
       await notificationsServices.initialiseNotification();
@@ -121,10 +112,32 @@ class _HomeState extends State<Home> {
     );
   }
 
+ void getCurrentUser() {
+    final user = supabase.auth.currentUser;
+    if (user == null) return;
+    final userId = user.id;
+
+    // Initialize chat badge service
+    chatBadgeService = ChatBadgeService(userId: userId);
+
+    // Fetch initial count
+    chatBadgeService.fetchUnread().then((_) {
+      if (mounted) setState(() => unreadCount = chatBadgeService.unreadCount);
+    });
+
+    // Listen real-time updates
+    chatBadgeService.listenUnread((count) {
+      if (mounted) setState(() => unreadCount = count);
+    });
+  }
+
+  
+
   void _updateUI() => setState(() {});
 
   @override
   void dispose() {
+    chatBadgeService.cancel();
     notificationTimer?.cancel();
     _listener?.cancel();
     _connectivityListener?.cancel();
@@ -469,21 +482,45 @@ class _HomeState extends State<Home> {
           ],
         ),
         actions: [
-          Stack(
+        Stack(
             children: [
-              AnimatedNotificationIcon(
-                notificationCount: notificationCount,
-                onPressed: () async {
-                  await Navigator.push(
+              IconButton(
+                icon: const Icon(Icons.support_agent, size: 30),
+                onPressed: () {
+                  Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (_) => const NotificationsPage()),
+                    MaterialPageRoute(
+                        builder: (_) => const MessagesPage()),
                   );
-                  loadNotificationCount();
                 },
               ),
+              if (unreadCount > 0)
+                Positioned(
+                  right: 4,
+                  top: 4,
+                  child: CircleAvatar(
+                    radius: 10,
+                    backgroundColor: Colors.red,
+                    child: Text(
+                      unreadCount.toString(),
+                      style:
+                          const TextStyle(fontSize: 10, color: Colors.white),
+                    ),
+                  ),
+                ),
             ],
           ),
-          const SizedBox(width: 10),
+
+          AnimatedNotificationIcon(
+            notificationCount: notificationCount,
+            onPressed: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const NotificationsPage()),
+              );
+              loadNotificationCount();
+            },
+          ),
         ],
       ),
       body: Stack(

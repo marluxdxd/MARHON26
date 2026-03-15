@@ -26,3 +26,10 @@ String formatToPHT(String? utcString) {
 //   final phtTime = utcTime.add(const Duration(hours: 8));
 //   return DateFormat('hh:mm a').format(phtTime); // only time, 12-hour format
 // }
+/// Converts a UTC datetime string to Philippine Time in 12-hour format
+String formatToPHT12(String utcString) {
+  if (utcString.isEmpty) return '';
+  final utcTime = DateTime.parse(utcString).toUtc();
+  final phtTime = utcTime.add(const Duration(hours: 8));
+  return DateFormat('yyyy-MM-dd hh:mm a').format(phtTime);
+}
